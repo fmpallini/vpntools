@@ -1,26 +1,82 @@
 <#
-	CISCO VPN Auto Reconnect Script - 1.1 by fmpallini@gmail.com - To use with AnyConnect 3.1.x
+	CISCO VPN Auto Reconnect Script - version 1.2 - To use with AnyConnect 3.1.x
 	This script should auto-elevate and maintain the VPN Connected through a powershell background script.
 	There is a left mouse click context button on the tray icon to disconnect and terminate the script.
-	If needed you can adjust the connection.dat writing to fit your VPN needs.
+
+	Some code snippets:
+	https://gist.github.com/jhorsman/88321511ce4f416c0605
+	https://gist.github.com/jakeballard/11240204
 #>
 
-#user configurable variable
+#user configurable variables
 $vpnurl = ""
 $vpngroup = ""
 $vpnuser = ""
-$vpnpass = "" #remember to escape special caracters with '`'
 $vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 
-# Get the ID and security principal of the current user account
-$myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
-$myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
- 
-# Get the security principal for the Administrator role
-$adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
- 
+#Import assembly to manipulate windows
+Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+
+#Windows Functions
+Add-Type @'
+  using System;
+  using System.Runtime.InteropServices;
+
+  public class WinFunc1 {
+     [DllImport("user32.dll")]
+     [return: MarshalAs(UnmanagedType.Bool)]
+     public static extern bool SetForegroundWindow(IntPtr hWnd);
+  }
+
+  public class WinFunc2 {
+     [DllImport("user32.dll")]
+     [return: MarshalAs(UnmanagedType.Bool)]
+     public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); 
+  }
+'@ -ErrorAction Stop
+
+#Connect Function
+Function VPNConnect()
+{
+    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl"
+    $counter = 0; $h = 0;
+    while($counter++ -lt 1000 -and $h -eq 0)
+    {
+        sleep -m 10
+        $h = (Get-Process vpncli).MainWindowHandle
+    }
+    [void] [WinFunc1]::SetForegroundWindow($h)
+    [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
+    [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
+    [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
+    [void] [WinFunc2]::ShowWindowAsync($h, 11)
+    start-sleep -seconds 10
+}
+
+#Disconnect Function
+Function VPNDisconnect()
+{
+	Invoke-Expression -Command ".\vpncli.exe disconnect"
+	#Terminate all vpnui processes.
+	Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui")
+	{$Id = $_.Id; Stop-Process $Id;}}
+	#Terminate all vpncli processes.
+	Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
+	{$Id = $_.Id; Stop-Process $Id;}}
+	Invoke-Expression -Command "net stop vpnagent"
+}
+
+#Check if its admin
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+
+#Check for previous saved password
+if(![System.IO.File]::Exists("$HOME\cred.txt") -and $isAdmin){
+   $cred = Get-Credential -UserName $vpnuser -Message "Enter you VPN password. It will be stored at you home folder using SecureString (DPAPI). The username will always use the one from the script variable."
+   $cred = $cred.Password
+}
+
 # Self-elevate the script if required
-if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+if (-Not $isAdmin) {
  if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
   $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
   Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine -WindowStyle Hidden
@@ -28,29 +84,20 @@ if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
  }
 }
 
-#Terminate all vpnui processes to avoid problems
-Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui")
-{$Id = $_.Id; Stop-Process $Id;}}
-#Terminate all vpncli processes.
-Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
-{$Id = $_.Id; Stop-Process $Id;}}
-Invoke-Expression -Command "net start vpnagent"
-
-#Make sure any connection its terminated
-Set-Location $vpnclipath
-Invoke-Expression -Command ".\vpncli.exe disconnect"
-
-#generate the files necessary to calling the connect command from cmd
-'connect ' + $vpnurl + "`r`n" + $vpngroup + "`r`n" + $vpnuser + "`r`n" + $vpnpass | Out-File -Encoding ascii 'connection.dat'
-'vpncli.exe -s < connection.dat' | Out-File -Encoding ascii 'connect.bat'
+#Use or Generate Credentials file
+if(![System.IO.File]::Exists("$HOME\cred.txt")){
+   $cred | ConvertFrom-SecureString |  Set-Content -Path "$HOME\cred.txt"
+}
+else
+{
+   $cred = Get-Content -Path "$HOME\cred.txt" | ConvertTo-SecureString
+}
+$vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred))))
 
 # set control variables
 $global:retry = 0
 $global:disconnect = 0
 $global:reconnect = 0
-
-#create the connection
-Start-Process -FilePath .\connect.bat -Wait -WindowStyle Minimized
 
 #create the notification tray icon
 Add-Type -AssemblyName System.Windows.Forms 
@@ -73,6 +120,14 @@ $objExitMenuItem.add_Click({
 $objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
 $balloon.ContextMenu = $objContextMenu
 
+#Make sure any previous connection its terminated
+Set-Location $vpnclipath
+VPNDisconnect
+
+#create the connection
+Invoke-Expression -Command "net start vpnagent"
+VPNConnect
+
 # check the sucess of the connection and go on or exit
 $OutputStatus = (.\vpncli.exe status) | Out-String
 
@@ -85,8 +140,10 @@ if(select-string -pattern "state: Connected" -InputObject $OutputStatus)
 else
 {
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-    $balloon.BalloonTipText = 'VPN not connected. Terminating PowerShell Script. Verify your credentials.'
+    $balloon.BalloonTipText = 'VPN not connected. Verify your configurations. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip(4000)
+    Remove-Item -Path "$HOME\cred.txt"
+    VPNDisconnect
     exit
 }
 
@@ -94,14 +151,7 @@ while ($true)
 {
     if($global:disconnect -eq 1)
     {
-        Invoke-Expression -Command ".\vpncli.exe disconnect"
-        #Terminate all vpnui processes.
-        Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui")
-        {$Id = $_.Id; Stop-Process $Id;}}
-        #Terminate all vpncli processes.
-        Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
-        {$Id = $_.Id; Stop-Process $Id;}}
-        Invoke-Expression -Command "net stop vpnagent"
+        VPNDisconnect
         
         $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
         $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
@@ -141,7 +191,7 @@ while ($true)
        }
 
        $global:retry++
-       Start-Process -FilePath .\connect.bat -Wait -WindowStyle Minimized
+       VPNConnect
     }
     elseif(select-string -pattern "state: Reconnecting" -InputObject $OutputStatus)
     {
