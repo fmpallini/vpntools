@@ -56,7 +56,7 @@ Function VPNConnect()
     [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
     [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
     [void] [WinFunc2]::ShowWindowAsync($h, 11)
-    start-sleep -seconds 10
+    start-sleep -seconds 5
 }
 
 #Disconnect Function
@@ -149,10 +149,13 @@ else
 {
     $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\error.ico")
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-    $balloon.BalloonTipText = 'VPN not connected. Verify your configurations. Terminating PowerShell Script.'
+    $balloon.BalloonTipText = 'VPN not connected. Verify your configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip(4000)
+    start-sleep -seconds 4
     Remove-Item -Path "$HOME\cred.txt"
     VPNDisconnect
+    $balloon.Visible = $false
+    $balloon.Dispose()
     exit
 }
 
@@ -165,7 +168,7 @@ while ($true)
         $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
         $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
         $balloon.ShowBalloonTip(3000)
-        start-sleep -seconds 5
+        start-sleep -seconds 3
 		$balloon.Visible = $false
         $balloon.Dispose()
         exit
@@ -190,16 +193,21 @@ while ($true)
        if($global:retry -eq 0)
        {
            $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
-           $balloon.BalloonTipText = 'VPN Connection Failed. Retrying in 60 seconds.'
+           $balloon.BalloonTipText = 'VPN Connection Failed. Retrying in 30 seconds.'
            $balloon.ShowBalloonTip(4000)
-		   start-sleep -seconds 55
+		   start-sleep -seconds 30
        }
        elseif($global:retry -ge 3)
        {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\error.ico")
            $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-           $balloon.BalloonTipText = 'VPN connection failed for 3 times in a row. Terminating PowerShell Script. Verify your credentials.'
+           $balloon.BalloonTipText = 'VPN connection failed for 3 times in a row. Verify your configurations/credentials. Terminating PowerShell Script.'
            $balloon.ShowBalloonTip(4000)
+           start-sleep -seconds 4
+           Remove-Item -Path "$HOME\cred.txt"
+           VPNDisconnect
+           $balloon.Visible = $false
+           $balloon.Dispose()
            exit
        }
 
