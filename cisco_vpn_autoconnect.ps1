@@ -78,6 +78,10 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 #Check for previous saved password
 if(![System.IO.File]::Exists("$HOME\cred.txt") -and $isAdmin){
    $cred = Get-Credential -UserName $vpnuser -Message "Enter you VPN password. It will be stored at you home folder using SecureString (DPAPI). The username will always use the one from the script variable."
+   if(!$cred)
+   {
+     Exit
+   }
    $cred = $cred.Password
 }
 
