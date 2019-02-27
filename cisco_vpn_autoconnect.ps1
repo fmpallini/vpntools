@@ -178,7 +178,8 @@ while ($true)
         exit
     }
 
-	$OutputStatus = (.\vpncli.exe status) | Out-String
+    $OutputStatus = (.\vpncli.exe status) | Out-String
+    $balloon.Text = "Last status check: " + (get-date).ToString('T')
 
     if ((select-string -pattern "state: Connected" -InputObject $OutputStatus) -and 
        (($global:retry -ne 0) -or ($global:reconnect -ne 0)))
