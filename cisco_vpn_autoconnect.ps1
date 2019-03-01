@@ -16,6 +16,13 @@ $vpnuser = ""
 $vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $credentials_file = "cred.txt"
 
+#icons
+$ico_connecting = $vpnclipath + "\res\transition_1.ico"
+$ico_idle = $vpnclipath + "\res\GUI.ico"
+$ico_connected = $vpnclipath + "\res\vpn_connected.ico"
+$ico_error = $vpnclipath + "\res\error.ico"
+$ico_warning = $vpnclipath + "\res\attention.ico"
+
 #Avoid duplicated instances
 if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
 {
@@ -108,7 +115,7 @@ $global:pause = 0
 #create the notification tray icon
 Add-Type -AssemblyName System.Windows.Forms 
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
-$balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\transition_1.ico")
+$balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
 $balloon.BalloonTipTitle = "VPN Connection"
 $balloon.Visible = $true
 
@@ -119,7 +126,7 @@ $objExitMenuItem.Index = 1
 $objExitMenuItem.Text = "Pause/Resume"
 $objExitMenuItem.add_Click({
 
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\GUI.ico")
+    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
 	$balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
 
     if($global:pause -eq 0)
@@ -142,10 +149,6 @@ $objExitMenuItem.Index = 2
 $objExitMenuItem.Text = "Exit"
 $objExitMenuItem.add_Click({
 	$global:disconnect = 1
-	$balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\transition_1.ico")
-	$balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
-	$balloon.BalloonTipText = 'Disconnecting...'
-	$balloon.ShowBalloonTip(1000)
 })
 $objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
 
@@ -170,21 +173,21 @@ $OutputStatus = (.\vpncli.exe status) | Out-String
 
 if(select-string -pattern "state: Connected" -InputObject $OutputStatus)
 {
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\vpn_connected.ico")
+    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connected)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
     $balloon.BalloonTipText = 'VPN successfully connected.'
     $balloon.ShowBalloonTip(4000)
 }
 else
 {
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\error.ico")
+    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
     $balloon.BalloonTipText = 'VPN not connected. Verify your configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip(4000)
-    start-sleep -seconds 4
-    Remove-Item -Path "$HOME\$credentials_file"
     VPNDisconnect
     Invoke-Expression -Command "net stop vpnagent"
+    Remove-Item -Path "$HOME\$credentials_file"
+    start-sleep -seconds 4
     $balloon.Visible = $false
     $balloon.Dispose()
     exit
@@ -215,7 +218,7 @@ while ($true)
         if ((select-string -pattern "state: Connected" -InputObject $OutputStatus) -and 
            (($global:retry -ne 0) -or ($global:reconnect -ne 0)))
 	    {
-            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\vpn_connected.ico")
+            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connected)
             $global:retry = 0
             $global:reconnect = 0
             $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
@@ -224,7 +227,7 @@ while ($true)
         }
         elseif(select-string -pattern "state: Disconnected" -InputObject $OutputStatus)
 	    {
-           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\attention.ico")
+           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
            if($global:retry -eq 0)
            {
@@ -235,14 +238,14 @@ while ($true)
            }
            elseif($global:retry -ge 3)
            {
-               $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\error.ico")
+               $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
                $balloon.BalloonTipText = 'VPN connection failed for 3 times in a row. Verify your configurations/credentials. Terminating PowerShell Script.'
                $balloon.ShowBalloonTip(4000)
                start-sleep -seconds 4
-               Remove-Item -Path "$HOME\$credentials_file"
                VPNDisconnect
                Invoke-Expression -Command "net stop vpnagent"
+               Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
                exit
@@ -253,7 +256,7 @@ while ($true)
         }
         elseif(select-string -pattern "state: Reconnecting" -InputObject $OutputStatus)
         {
-           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($vpnclipath + "\res\attention.ico")
+           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 	   
            if(($global:reconnect%10) -eq 0)
            {
