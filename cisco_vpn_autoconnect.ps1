@@ -10,7 +10,7 @@
 
 #user configurable variables
 $vpnurl = ""
-$vpngroup = ""
+$vpngroup = "" #keep empty if theres no secundary option
 $vpnuser = ""
 
 $vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
@@ -61,7 +61,10 @@ Function VPNConnect()
         $h = (Get-Process vpncli).MainWindowHandle
     }
     [void] [WinFunc1]::SetForegroundWindow($h)
-    [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
+    if($vpngroup -ne "")
+    {
+	   [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
+	}
     [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
     [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
     [void] [WinFunc2]::ShowWindowAsync($h, 11)
