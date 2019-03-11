@@ -1,5 +1,5 @@
 <#
-	CISCO VPN Auto Reconnect Script - version 1.3 - To use with AnyConnect 3.1.x
+	CISCO VPN Auto Reconnect Script - version 1.4 - To use with AnyConnect 3.1.x
 	This script should auto-elevate and maintain the VPN Connected through a powershell background script.
 	There is a left mouse click context button on the tray icon to disconnect and terminate the script.
 
@@ -10,11 +10,12 @@
 
 #user configurable variables
 $vpnurl = ""
-$vpngroup = "" #keep empty if theres no secundary option
+$vpngroup = "" #keep it empty if there's no secundary Group option
 $vpnuser = ""
 
 $vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $credentials_file = "cred.txt"
+$seconds_to_connection_fail = 10
 
 #icons
 $ico_connecting = $vpnclipath + "\res\transition_1.ico"
@@ -68,7 +69,26 @@ Function VPNConnect()
     [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
     [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
     [void] [WinFunc2]::ShowWindowAsync($h, 11)
-    start-sleep -seconds 5
+
+    #wait to connection
+    $counter = 0; $process = 0;
+    while($counter++ -lt $seconds_to_connection_fail)
+    {
+        $process = (Get-Process vpncli).Id
+        if($process -gt 0)
+        {
+           sleep 1
+        }
+        else
+        {
+           break
+        }
+    }
+
+    if($process -gt 0 -and $counter -gt $seconds_to_connection_fail)
+    {
+       Stop-Process $process;
+    }
 }
 
 #Disconnect Function
@@ -188,7 +208,6 @@ else
     $balloon.BalloonTipText = 'VPN not connected. Verify your configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip(4000)
     VPNDisconnect
-    Invoke-Expression -Command "net stop vpnagent"
     Remove-Item -Path "$HOME\$credentials_file"
     start-sleep -seconds 4
     $balloon.Visible = $false
@@ -201,7 +220,6 @@ while ($true)
     if($global:disconnect -eq 1)
     {
         VPNDisconnect
-        Invoke-Expression -Command "net stop vpnagent"
         
         $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
         $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
@@ -247,7 +265,6 @@ while ($true)
                $balloon.ShowBalloonTip(4000)
                start-sleep -seconds 4
                VPNDisconnect
-               Invoke-Expression -Command "net stop vpnagent"
                Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
