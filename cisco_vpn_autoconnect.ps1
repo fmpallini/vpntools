@@ -184,8 +184,6 @@ $objExitMenuItem.add_Click({
 $objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
 $balloon.ContextMenu = $objContextMenu
 
-#Make sure any previous connection its terminated
-Set-Location $vpnclipath
 #Terminate all other vpnui processes.
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui")
 {$Id = $_.Id; Stop-Process $Id;}}
@@ -195,6 +193,9 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 
 #clear unused variables
 Remove-Variable isAdmin, cred, CommandLine, Id
+
+#Set working path
+Set-Location $vpnclipath
 
 #create the connection
 VPNConnect
