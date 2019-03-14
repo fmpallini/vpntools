@@ -1,5 +1,5 @@
 <#
-	CISCO VPN Auto Reconnect Script - version 1.4a - To use with AnyConnect 3.1.x
+	CISCO VPN Auto Reconnect Script - version 1.5 - To use with AnyConnect 3.1.x
 	This script should self-elevate and maintain the VPN Connected through a powershell background script.
 	You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -34,10 +34,10 @@ if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and 
    exit
 }
 
-#Import assembly to manipulate windows
+#Import assembly to send keys
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
 
-#Windows Functions
+#Windows Functions - Bring foreground / minimize
 Add-Type @'
   using System;
   using System.Runtime.InteropServices;
@@ -74,12 +74,12 @@ Function VPNConnect()
     [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
     [void] [WinFunc2]::ShowWindowAsync($h, 11)
 
-    #wait to connection
-    $counter = 0; $process = 0;
+    #wait for connection
+    $counter = 0; $h = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
-        $process = (Get-Process vpncli).Id
-        if($process -gt 0)
+        $h = (Get-Process vpncli).Id
+        if($h -gt 0)
         {
            sleep 1
         }
@@ -89,10 +89,12 @@ Function VPNConnect()
         }
     }
 
-    if($process -gt 0 -and $counter -gt $seconds_connection_fail)
+    if($h -gt 0 -and $counter -gt $seconds_connection_fail)
     {
-       Stop-Process $process;
+       Stop-Process $h;
     }
+    
+    Remove-Variable h, counter
 }
 
 #Disconnect Function
@@ -114,11 +116,11 @@ if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
    $cred = $cred.Password
 }
 
-# Self-elevate the script if required
+#Self-elevate the script if required
 if (-Not $isAdmin) {
  if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
   $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
-  Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine -WindowStyle Hidden 
+  Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Hidden -ArgumentList $CommandLine
   Exit
  }
 }
@@ -133,21 +135,21 @@ else
 }
 $vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred))))
 
-# set control variables
+#Set control variables
 $global:retry = 0
 $global:disconnect = 0
 $global:reconnect = 0
 $global:pause = 0
 
-#create the notification tray icon
+#Create the notification tray icon
 Add-Type -AssemblyName System.Windows.Forms 
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
 $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
 $balloon.BalloonTipTitle = "VPN Connection"
 $balloon.Visible = $true
 
+#Create the context menu
 $objContextMenu = New-Object System.Windows.Forms.ContextMenu
-
 $objExitMenuItem = New-Object System.Windows.Forms.MenuItem
 $objExitMenuItem.Index = 1
 $objExitMenuItem.Text = "Pause/Resume"
@@ -180,21 +182,21 @@ $objExitMenuItem.add_Click({
 
 })
 $objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
-
-
 $balloon.ContextMenu = $objContextMenu
 
 #Make sure any previous connection its terminated
 Set-Location $vpnclipath
-#Terminate all vpnui processes.
+#Terminate all other vpnui processes.
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui")
 {$Id = $_.Id; Stop-Process $Id;}}
-#Terminate all vpncli processes.
+#Terminate all other vpncli processes.
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
+#clear unused variables
+Remove-Variable isAdmin, cred, CommandLine, Id
+
 #create the connection
-Invoke-Expression -Command "net start vpnagent"
 VPNConnect
 
 # check the sucess of the connection and go on or exit
