@@ -198,6 +198,7 @@ Remove-Variable isAdmin, cred, CommandLine, Id
 Set-Location $vpnclipath
 
 #create the connection
+VPNDisconnect
 VPNConnect
 
 # check the sucess of the connection and go on or exit
