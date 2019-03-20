@@ -84,14 +84,14 @@ Function VPNConnect()
 
         if($window)
         {
-           [void] [WinFunc1]::SetForegroundWindow($h)
+           [void] [WinFunc1]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $str)
            {
               [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
-           [void] [WinFunc2]::ShowWindowAsync($h, 11)
+           [void] [WinFunc2]::ShowWindowAsync($window, 11)
 
            #wait for connection
            $h = 0;
