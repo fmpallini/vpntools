@@ -1,5 +1,5 @@
 <#
-	CISCO VPN Auto Reconnect Script - version 1.5 - To use with AnyConnect 3.1.x
+	CISCO VPN Auto Reconnect Script - version 1.6 - To use with AnyConnect 3.1.x or 4.5.x
 	This script should self-elevate and maintain the VPN Connected through a powershell background script.
 	You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -8,17 +8,17 @@
 	https://gist.github.com/jakeballard/11240204
 
 	If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
-	Keep in mind that if the VPN already suggest a default vpngroup you should leave this field empty in the script.
 #>
 
 #user configurable variables
 $vpnurl = ""
-$vpngroup = "" #keep it empty if there's no secundary Group option
+$vpngroup = ""
 $vpnuser = ""
 
 $vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $credentials_file = "cred.txt"
-$seconds_connection_fail = 10
+$connection_stdout = "vpn_stdout.txt"
+$seconds_connection_fail = 20
 $seconds_notification = 3
 
 #icons
@@ -58,43 +58,65 @@ Add-Type @'
 #Connect Function
 Function VPNConnect()
 {
-    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl"
-    $counter = 0; $h = 0;
-    while($counter++ -lt 1000 -and $h -eq 0)
-    {
-        sleep -m 10
-        $h = (Get-Process vpncli).MainWindowHandle
-    }
-    [void] [WinFunc1]::SetForegroundWindow($h)
-    if($vpngroup -ne "")
-    {
-       [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
-    }
-    [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
-    [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
-    [void] [WinFunc2]::ShowWindowAsync($h, 11)
-
-    #wait for connection
-    $counter = 0; $h = 0;
+    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
+    $counter = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
-        $h = (Get-Process vpncli).Id
-        if($h -gt 0)
+        sleep 1
+        $str = Get-Content "$HOME\$connection_stdout" -Tail 1
+        if((select-string -pattern "Group:" -InputObject $str) -or (select-string -pattern "Username:" -InputObject $str))
         {
-           sleep 1
-        }
-        else
-        {
-           break
+          break;
         }
     }
 
-    if($h -gt 0 -and $counter -gt $seconds_connection_fail)
+    if($counter++ -gt $seconds_connection_fail)
     {
-       Stop-Process $h;
+        $h = (Get-Process vpncli).Id
+        if($h)
+        {
+           Stop-Process $h;
+        }
     }
-    
-    Remove-Variable h, counter
+    else
+    {
+        $window = (Get-Process vpncli).MainWindowHandle
+
+        if($window)
+        {
+           [void] [WinFunc1]::SetForegroundWindow($h)
+           if (select-string -pattern "Group:" -InputObject $str)
+           {
+              [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
+           }
+           [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
+           [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
+           [void] [WinFunc2]::ShowWindowAsync($h, 11)
+
+           #wait for connection
+           $h = 0;
+           while($counter++ -lt $seconds_connection_fail)
+           {
+             $h = (Get-Process vpncli).Id
+             if($h -gt 0)
+             {
+               sleep 1
+             }
+             else
+             {
+               break
+             }
+           }
+
+           if($h -gt 0)
+           {
+              Stop-Process $h;
+           }
+        }
+    }
+
+    Remove-Variable h, counter, str, window
+    Remove-Item -Path "$HOME\$connection_stdout"
 }
 
 #Disconnect Function
@@ -192,7 +214,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
 #clear unused variables
-Remove-Variable isAdmin, cred, CommandLine, Id
+Remove-Variable isAdmin, cred, Id
 
 #Set working path
 Set-Location $vpnclipath
