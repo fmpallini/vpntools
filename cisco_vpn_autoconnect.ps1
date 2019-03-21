@@ -63,8 +63,8 @@ Function VPNConnect()
     while($counter++ -lt $seconds_connection_fail)
     {
         sleep 1
-        $str = Get-Content "$HOME\$connection_stdout" -Tail 1
-        if((select-string -pattern "Group:" -InputObject $str) -or (select-string -pattern "Username:" -InputObject $str))
+        $last_line = Get-Content "$HOME\$connection_stdout" -Tail 1
+        if((select-string -pattern "Group:" -InputObject $last_line) -or (select-string -pattern "Username:" -InputObject $last_line))
         {
           break;
         }
@@ -72,10 +72,10 @@ Function VPNConnect()
 
     if($counter++ -gt $seconds_connection_fail)
     {
-        $h = (Get-Process vpncli).Id
-        if($h)
+        $process_id = (Get-Process vpncli).Id
+        if($process_id)
         {
-           Stop-Process $h;
+           Stop-Process $process_id;
         }
     }
     else
@@ -85,7 +85,7 @@ Function VPNConnect()
         if($window)
         {
            [void] [WinFunc1]::SetForegroundWindow($window)
-           if (select-string -pattern "Group:" -InputObject $str)
+           if (select-string -pattern "Group:" -InputObject $last_line)
            {
               [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
            }
@@ -94,11 +94,10 @@ Function VPNConnect()
            [void] [WinFunc2]::ShowWindowAsync($window, 11)
 
            #wait for connection
-           $h = 0;
            while($counter++ -lt $seconds_connection_fail)
            {
-             $h = (Get-Process vpncli).Id
-             if($h -gt 0)
+             $process_id = (Get-Process vpncli).Id
+             if($process_id)
              {
                sleep 1
              }
@@ -108,14 +107,14 @@ Function VPNConnect()
              }
            }
 
-           if($h -gt 0)
+           if($process_id)
            {
-              Stop-Process $h;
+              Stop-Process $process_id;
            }
         }
     }
 
-    Remove-Variable h, counter, str, window
+    Remove-Variable process_id, counter, last_line, window
     Remove-Item -Path "$HOME\$connection_stdout"
 }
 
