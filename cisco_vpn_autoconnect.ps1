@@ -64,7 +64,7 @@ Add-Type @'
 #Connect Function
 Function VPNConnect()
 {
-    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout"
+    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
     $counter = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
@@ -91,7 +91,6 @@ Function VPNConnect()
         if($window)
         {
            [void] [WinFunc3]::BlockInput($true)
-           sleep 1
            [void] [WinFunc1]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
