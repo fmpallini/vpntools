@@ -42,22 +42,18 @@ Add-Type @'
   using System;
   using System.Runtime.InteropServices;
 
-  public class WinFunc1 {
+  public class WinFunc {
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool SetForegroundWindow(IntPtr hWnd);
-  }
 
-  public class WinFunc2 {
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
-     public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); 
-  }
-  
-  public class WinFunc3 {
-  [DllImport("user32.dll")]
-  [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool BlockInput(bool fBlockIt);
+     public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+     [DllImport("user32.dll")]
+     [return: MarshalAs(UnmanagedType.Bool)]
+     public static extern bool BlockInput(bool fBlockIt);
   }
 '@ -ErrorAction Stop
 
@@ -90,16 +86,16 @@ Function VPNConnect()
 
         if($window)
         {
-           [void] [WinFunc3]::BlockInput($true)
-           [void] [WinFunc1]::SetForegroundWindow($window)
+           [void] [WinFunc]::BlockInput($true)
+           [void] [WinFunc]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
               [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
-           [void] [WinFunc2]::ShowWindowAsync($window, 11)
-           [void] [WinFunc3]::BlockInput($false)
+           [void] [WinFunc]::ShowWindowAsync($window, 11)
+           [void] [WinFunc]::BlockInput($false)
 
            #wait for connection
            while($counter++ -lt $seconds_connection_fail)
