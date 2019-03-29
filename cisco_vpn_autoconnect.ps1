@@ -64,7 +64,7 @@ Add-Type @'
 #Connect Function
 Function VPNConnect()
 {
-    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
+    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout"
     $counter = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
@@ -91,8 +91,7 @@ Function VPNConnect()
         if($window)
         {
            [void] [WinFunc3]::BlockInput($true)
-           $cursor = [Windows.Forms.Cursor]::Position
-           [Windows.Forms.Cursor]::Position = "0,0"
+           sleep 1
            [void] [WinFunc1]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
@@ -101,7 +100,6 @@ Function VPNConnect()
            [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
            [void] [WinFunc2]::ShowWindowAsync($window, 11)
-           [Windows.Forms.Cursor]::Position = $cursor
            [void] [WinFunc3]::BlockInput($false)
 
            #wait for connection
@@ -125,7 +123,7 @@ Function VPNConnect()
         }
     }
 
-    Remove-Variable process_id, counter, last_line, window, cursor
+    Remove-Variable process_id, counter, last_line, window
     Remove-Item -Path "$HOME\$connection_stdout"
 }
 
