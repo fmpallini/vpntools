@@ -1,5 +1,5 @@
 <#
-	CISCO VPN Auto Reconnect Script - version 1.6 - To use with AnyConnect 3.1.x or 4.5.x
+	CISCO VPN Auto Reconnect Script - version 1.7 - To use with AnyConnect 3.1.x or 4.5.x
 	This script should self-elevate and maintain the VPN Connected through a powershell background script.
 	You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -53,6 +53,12 @@ Add-Type @'
      [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); 
   }
+  
+  public class WinFunc3 {
+  [DllImport("user32.dll")]
+  [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool BlockInput(bool fBlockIt);
+  }
 '@ -ErrorAction Stop
 
 #Connect Function
@@ -84,6 +90,9 @@ Function VPNConnect()
 
         if($window)
         {
+           [void] [WinFunc3]::BlockInput($true)
+           $cursor = [Windows.Forms.Cursor]::Position
+           [Windows.Forms.Cursor]::Position = "0,0"
            [void] [WinFunc1]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
@@ -92,6 +101,8 @@ Function VPNConnect()
            [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
            [void] [WinFunc2]::ShowWindowAsync($window, 11)
+           [Windows.Forms.Cursor]::Position = $cursor
+           [void] [WinFunc3]::BlockInput($false)
 
            #wait for connection
            while($counter++ -lt $seconds_connection_fail)
@@ -114,7 +125,7 @@ Function VPNConnect()
         }
     }
 
-    Remove-Variable process_id, counter, last_line, window
+    Remove-Variable process_id, counter, last_line, window, cursor
     Remove-Item -Path "$HOME\$connection_stdout"
 }
 
