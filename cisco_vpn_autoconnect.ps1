@@ -1,13 +1,13 @@
 <#
-	CISCO VPN Auto Reconnect Script - version 1.7 - To use with AnyConnect 3.1.x or 4.5.x
-	This script should self-elevate and maintain the VPN Connected through a powershell background script.
-	You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
+   CISCO VPN Auto Reconnect Script - version 1.8 - To use with AnyConnect 3.1.x or 4.5.x
+   This script should self-elevate and maintain the VPN Connected through a powershell background script.
+   You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
-	Some code snippets:
-	https://gist.github.com/jhorsman/88321511ce4f416c0605
-	https://gist.github.com/jakeballard/11240204
+   Some code snippets:
+   https://gist.github.com/jhorsman/88321511ce4f416c0605
+   https://gist.github.com/jakeballard/11240204
 
-	If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
+   If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
 #>
 
 #user configurable variables
@@ -31,7 +31,7 @@ $ico_warning = $vpnclipath + "\res\attention.ico"
 #Avoid duplicated instances
 if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
 {
-   exit
+   Exit
 }
 
 #Import assembly to send keys
@@ -125,7 +125,7 @@ Function VPNConnect()
 #Disconnect Function
 Function VPNDisconnect()
 {
-	Invoke-Expression -Command ".\vpncli.exe disconnect"
+   Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
 #Check if its admin
@@ -162,7 +162,6 @@ $vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropSe
 
 #Set control variables
 $global:retry = 0
-$global:disconnect = 0
 $global:reconnect = 0
 $global:pause = 0
 
@@ -184,8 +183,8 @@ $objExitMenuItem.add_Click({
 
     if($global:pause -eq 0)
     {
-       VPNDisconnect
        $global:pause = 1
+       VPNDisconnect
        $balloon.Text = "Connection paused on: " + (get-date).ToString('T')
     }
     else
@@ -202,8 +201,17 @@ $objExitMenuItem.Index = 2
 $objExitMenuItem.Text = "Exit"
 $objExitMenuItem.add_Click({
 
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
-    $global:disconnect = 1
+   $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
+   $global:pause = 1
+   VPNDisconnect
+
+   $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
+   $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
+   $balloon.ShowBalloonTip($seconds_notification)
+   start-sleep -seconds $seconds_notification
+   $balloon.Visible = $false
+   $balloon.Dispose()
+   Stop-Process -Id $pid;
 
 })
 $objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
@@ -252,22 +260,8 @@ else
 
 while ($true)
 {
-    if($global:disconnect -eq 1)
-    {
-        VPNDisconnect
-
-        $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
-        $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
-        $balloon.ShowBalloonTip($seconds_notification)
-        start-sleep -seconds $seconds_notification
-        $balloon.Visible = $false
-        $balloon.Dispose()
-        exit
-    }
-
     if($global:pause -eq 0)
     {
-
         $OutputStatus = (.\vpncli.exe status) | Out-String
         $balloon.Text = "Last status check: " + (get-date).ToString('T')
 
