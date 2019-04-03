@@ -128,6 +128,25 @@ Function VPNDisconnect()
    Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
+#Validate variables
+if(!$vpnurl -or !$vpnuser)
+{
+   [System.Windows.Forms.MessageBox]::Show('Required variables not filled. Please check inside the script.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
+   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+if(![System.IO.File]::Exists($ico_connecting) -or
+   ![System.IO.File]::Exists($ico_idle) -or
+   ![System.IO.File]::Exists($ico_connected) -or
+   ![System.IO.File]::Exists($ico_error) -or
+   ![System.IO.File]::Exists($ico_warning))
+{
+   $ico_connecting = $ico_idle = $ico_connected = $ico_error = $ico_warning = $vpnclipath + "\vpncli.exe"
+}
+
 #Check if its admin
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
 
