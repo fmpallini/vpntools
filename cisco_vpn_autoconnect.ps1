@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 1.8 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 1.9 - To use with AnyConnect 3.1.x or 4.5.x
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
    You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -137,14 +137,6 @@ if(!$vpnurl -or !$vpnuser)
 if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
    [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
    Exit
-}
-if(![System.IO.File]::Exists($ico_connecting) -or
-   ![System.IO.File]::Exists($ico_idle) -or
-   ![System.IO.File]::Exists($ico_connected) -or
-   ![System.IO.File]::Exists($ico_error) -or
-   ![System.IO.File]::Exists($ico_warning))
-{
-   $ico_connecting = $ico_idle = $ico_connected = $ico_error = $ico_warning = $vpnclipath + "\vpncli.exe"
 }
 
 #Check if its admin
