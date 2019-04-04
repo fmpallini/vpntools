@@ -177,7 +177,6 @@ $global:reconnect = 0
 $global:pause = 0
 
 #Create the notification tray icon
-Add-Type -AssemblyName System.Windows.Forms 
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
 $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
 $balloon.BalloonTipTitle = "VPN Connection"
