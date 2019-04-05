@@ -28,16 +28,10 @@ $ico_connected = $vpnclipath + "\res\vpn_connected.ico"
 $ico_error = $vpnclipath + "\res\error.ico"
 $ico_warning = $vpnclipath + "\res\attention.ico"
 
-#Avoid duplicated instances
-if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
-{
-   Exit
-}
-
-#Import assembly to send keys
+#Import assembly to use send keys
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
 
-#Windows Functions - Bring foreground / minimize
+#Windows Functions
 Add-Type @'
   using System;
   using System.Runtime.InteropServices;
@@ -49,15 +43,29 @@ Add-Type @'
 
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
-     public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-
-     [DllImport("user32.dll")]
-     [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool BlockInput(bool fBlockIt);
   }
 '@ -ErrorAction Stop
 
-#Connect Function
+#Avoid duplicated instances
+if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+{
+   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
+#Validate variables
+if(!$vpnurl -or !$vpnuser)
+{
+   [System.Windows.Forms.MessageBox]::Show('Required variables not filled. Please check inside the script.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
+   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
+#Functions
 Function VPNConnect()
 {
     Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
@@ -86,15 +94,14 @@ Function VPNConnect()
 
         if($window)
         {
-           [void] [WinFunc]::BlockInput($true)
            [void] [WinFunc]::SetForegroundWindow($window)
+           [void] [WinFunc]::BlockInput($true)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
               [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
-           [void] [WinFunc]::ShowWindowAsync($window, 11)
            [void] [WinFunc]::BlockInput($false)
 
            #wait for connection
@@ -122,21 +129,9 @@ Function VPNConnect()
     Remove-Item -Path "$HOME\$connection_stdout"
 }
 
-#Disconnect Function
 Function VPNDisconnect()
 {
    Invoke-Expression -Command ".\vpncli.exe disconnect"
-}
-
-#Validate variables
-if(!$vpnurl -or !$vpnuser)
-{
-   [System.Windows.Forms.MessageBox]::Show('Required variables not filled. Please check inside the script.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
-}
-if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
-   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
-   Exit
 }
 
 #Check if its admin
