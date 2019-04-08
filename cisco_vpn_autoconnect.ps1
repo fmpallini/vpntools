@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 1.9 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 1.91 - To use with AnyConnect 3.1.x or 4.5.x
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
    You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -20,6 +20,7 @@ $credentials_file = "cred.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
+$seconds_main_loop = 5
 
 #icons
 $ico_connecting = $vpnclipath + "\res\transition_1.ico"
@@ -72,7 +73,7 @@ Function VPNConnect()
     $counter = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
-        sleep 1
+        start-sleep -seconds 1
         $last_line = Get-Content "$HOME\$connection_stdout" -Tail 1
         if((select-string -pattern "Group:" -InputObject $last_line) -or (select-string -pattern "Username:" -InputObject $last_line))
         {
@@ -80,7 +81,7 @@ Function VPNConnect()
         }
     }
 
-    if($counter++ -gt $seconds_connection_fail)
+    if($counter++ -ge $seconds_connection_fail)
     {
         $process_id = (Get-Process vpncli).Id
         if($process_id)
@@ -110,7 +111,7 @@ Function VPNConnect()
              $process_id = (Get-Process vpncli).Id
              if($process_id)
              {
-               sleep 1
+               start-sleep -seconds 1
              }
              else
              {
@@ -189,6 +190,7 @@ $objExitMenuItem.add_Click({
     if($global:pause -eq 0)
     {
        $global:pause = 1
+       start-sleep -seconds $seconds_main_loop
        VPNDisconnect
        $balloon.Text = "Connection paused on: " + (get-date).ToString('T')
     }
@@ -208,6 +210,7 @@ $objExitMenuItem.add_Click({
 
    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
    $global:pause = 1
+   start-sleep -seconds $seconds_main_loop
    VPNDisconnect
 
    $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
@@ -284,14 +287,14 @@ while ($true)
         {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
-           if($global:retry -eq 0)
+           if($global:retry -lt 3)
            {
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
                $balloon.BalloonTipText = 'VPN Connection Failed. Retrying in 30 seconds.'
                $balloon.ShowBalloonTip($seconds_notification)
                start-sleep -seconds 30
            }
-           elseif($global:retry -ge 3)
+           else
            {
                $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
@@ -323,6 +326,6 @@ while ($true)
         }
     }
 
-    start-sleep -seconds 5
+    start-sleep -seconds $seconds_main_loop
     [System.Windows.Forms.Application]::DoEvents()
 }
