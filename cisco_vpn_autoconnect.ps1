@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 1.92 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 1.93 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -22,7 +22,7 @@ $credentials_file = "cred.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
-$seconds_main_loop = 8
+$seconds_main_loop = 5
 
 #icons
 $ico_connecting = $vpnclipath + "\res\transition_1.ico"
@@ -267,6 +267,9 @@ else
     $balloon.Dispose()
     exit
 }
+
+#Force GC before main loop
+[System.GC]::Collect()
 
 while ($true)
 {
