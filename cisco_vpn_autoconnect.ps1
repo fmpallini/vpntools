@@ -1,5 +1,7 @@
 <#
    CISCO VPN Auto Reconnect Script - version 1.92 - To use with AnyConnect 3.1.x or 4.5.x
+   https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
+
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
    You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
 
@@ -20,7 +22,7 @@ $credentials_file = "cred.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
-$seconds_main_loop = 10
+$seconds_main_loop = 8
 
 #icons
 $ico_connecting = $vpnclipath + "\res\transition_1.ico"
@@ -81,7 +83,7 @@ Function VPNConnect()
         }
     }
 
-    if($counter++ -ge $seconds_connection_fail)
+    if($counter -ge $seconds_connection_fail)
     {
         $process_id = (Get-Process vpncli).Id
         if($process_id)
@@ -126,7 +128,7 @@ Function VPNConnect()
         }
     }
 
-    Remove-Variable process_id, counter, last_line, window
+    Remove-Variable counter, last_line, window, process_id
     Remove-Item -Path "$HOME\$connection_stdout"
 }
 
@@ -180,10 +182,10 @@ $balloon.Visible = $true
 
 #Create the context menu
 $objContextMenu = New-Object System.Windows.Forms.ContextMenu
-$objExitMenuItem = New-Object System.Windows.Forms.MenuItem
-$objExitMenuItem.Index = 1
-$objExitMenuItem.Text = "Pause/Resume"
-$objExitMenuItem.add_Click({
+$objMenuItem = New-Object System.Windows.Forms.MenuItem
+$objMenuItem.Index = 1
+$objMenuItem.Text = "Pause/Resume"
+$objMenuItem.add_Click({
 
     $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
 
@@ -201,12 +203,12 @@ $objExitMenuItem.add_Click({
        $global:pause = 0
     }
 })
-$objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
+$objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
 
-$objExitMenuItem = New-Object System.Windows.Forms.MenuItem
-$objExitMenuItem.Index = 2
-$objExitMenuItem.Text = "Exit"
-$objExitMenuItem.add_Click({
+$objMenuItem = New-Object System.Windows.Forms.MenuItem
+$objMenuItem.Index = 2
+$objMenuItem.Text = "Exit"
+$objMenuItem.add_Click({
 
    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
    $global:pause = 1
@@ -222,7 +224,7 @@ $objExitMenuItem.add_Click({
    Stop-Process -Id $pid;
 
 })
-$objContextMenu.MenuItems.Add($objExitMenuItem) | Out-Null
+$objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
 $balloon.ContextMenu = $objContextMenu
 
 #Terminate all other vpnui processes.
@@ -233,7 +235,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
 #clear unused variables
-Remove-Variable isAdmin, cred, Id
+Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem
 
 #Set working path
 Set-Location $vpnclipath
