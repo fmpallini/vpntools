@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 1.93 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 1.94 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -12,12 +12,14 @@
    If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
 #>
 
-#user configurable variables
+#connection data - leave empty to use the values from default connection
 $vpnurl = ""
 $vpngroup = ""
 $vpnuser = ""
 
-$vpnclipath = "C:\Program Files (x86)\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
+#configs
+$vpnclipath = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
+$default_preferences_file = "$HOME\AppData\Local\Cisco\Cisco AnyConnect Secure Mobility Client\preferences.xml"
 $credentials_file = "cred.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
@@ -57,11 +59,20 @@ if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and 
    Exit
 }
 
-#Validate variables
+#Validate/treat variables
 if(!$vpnurl -or !$vpnuser)
 {
-   [System.Windows.Forms.MessageBox]::Show('Required variables not filled. Please check inside the script.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
+   if(![System.IO.File]::Exists($default_preferences_file))
+   {
+      [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
+      Exit
+   }
+
+   $preferences = [xml](Get-Content $default_preferences_file)
+
+   $vpnurl = $preferences.AnyConnectPreferences.DefaultHostName
+   $vpnuser = $preferences.AnyConnectPreferences.DefaultUser
+   $vpngroup = $preferences.AnyConnectPreferences.DefaultGroup
 }
 if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
    [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
@@ -142,7 +153,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 #Check for previous saved password
 if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
-   $cred = Get-Credential -UserName $vpnuser -Message "Enter you VPN password. It will be stored at you home folder using SecureString (DPAPI). The username will always use the one from the script variable."
+   $cred = Get-Credential -UserName $vpnuser -Message "Enter you VPN password. It will be stored at you home folder using SecureString (DPAPI). The username will always use the one from the default connection or script variable."
    if(!$cred)
    {
      Exit
@@ -235,7 +246,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
 #clear unused variables
-Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem
+Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
 
 #Set working path
 Set-Location $vpnclipath
