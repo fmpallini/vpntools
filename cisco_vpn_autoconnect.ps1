@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 1.94 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.0 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -15,7 +15,6 @@
 #connection data - leave empty to use the values from default connection
 $vpnurl = ""
 $vpngroup = ""
-$vpnuser = ""
 
 #configs
 $vpnclipath = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
@@ -60,7 +59,7 @@ if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and 
 }
 
 #Validate/treat variables
-if(!$vpnurl -or !$vpnuser)
+if(!$vpnurl -or !$vpngroup)
 {
    if(![System.IO.File]::Exists($default_preferences_file))
    {
@@ -73,6 +72,12 @@ if(!$vpnurl -or !$vpnuser)
    $vpnurl = $preferences.AnyConnectPreferences.DefaultHostName
    $vpnuser = $preferences.AnyConnectPreferences.DefaultUser
    $vpngroup = $preferences.AnyConnectPreferences.DefaultGroup
+   
+   if(!$vpnurl -or !$vpngroup)
+   {
+      [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
+      Exit
+   }
 }
 if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
    [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
@@ -153,12 +158,18 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 #Check for previous saved password
 if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
-   $cred = Get-Credential -UserName $vpnuser -Message "Enter you VPN password. It will be stored at you home folder using SecureString (DPAPI). The username will always use the one from the default connection or script variable."
+   $cred = Get-Credential -UserName $vpnuser -Message "Enter you username and password. Those data will be stored at you home folder using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten inside the script.`r`n`r`nUrl: $vpnurl `r`nGroup: $vpngroup"
    if(!$cred)
    {
      Exit
    }
-   $cred = $cred.Password
+
+   $cred = @{
+    user = $cred.UserName
+    pass = $cred.Password | ConvertFrom-SecureString
+    url = $vpnurl
+    group = $vpngroup
+   }
 }
 
 #Self-elevate the script if required
@@ -172,13 +183,17 @@ if (-Not $isAdmin) {
 
 #Use or Generate Credentials file
 if(![System.IO.File]::Exists("$HOME\$credentials_file")){
-   $cred | ConvertFrom-SecureString |  Set-Content -Path "$HOME\$credentials_file"
+   $cred | ConvertTo-Json | Set-Content -Path "$HOME\$credentials_file"
 }
 else
 {
-   $cred = Get-Content -Path "$HOME\$credentials_file" | ConvertTo-SecureString
+   $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
 }
-$vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred))))
+$cred.pass = $cred.pass | ConvertTo-SecureString
+$vpnuser = $cred.user
+$vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred.pass))))
+$vpnurl = $cred.url
+$vpngroup = $cred.group
 
 #Set control variables
 $global:retry = 0
@@ -269,7 +284,7 @@ else
 {
     $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-    $balloon.BalloonTipText = 'VPN not connected. Verify your configurations/credentials. Terminating PowerShell Script.'
+    $balloon.BalloonTipText = 'VPN failed to connected. Verify your configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip($seconds_notification)
     VPNDisconnect
     Remove-Item -Path "$HOME\$credentials_file"
