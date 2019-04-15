@@ -59,6 +59,10 @@ if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and 
 }
 
 #Validate/treat variables
+if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
+   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
 if(!$vpnurl -or !$vpngroup)
 {
    if(![System.IO.File]::Exists($default_preferences_file))
@@ -72,16 +76,12 @@ if(!$vpnurl -or !$vpngroup)
    $vpnurl = $preferences.AnyConnectPreferences.DefaultHostName
    $vpnuser = $preferences.AnyConnectPreferences.DefaultUser
    $vpngroup = $preferences.AnyConnectPreferences.DefaultGroup
-   
+
    if(!$vpnurl -or !$vpngroup)
    {
       [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
       Exit
    }
-}
-if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
-   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
-   Exit
 }
 
 #Functions
@@ -284,7 +284,7 @@ else
 {
     $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-    $balloon.BalloonTipText = 'VPN failed to connected. Verify your configurations/credentials. Terminating PowerShell Script.'
+    $balloon.BalloonTipText = 'VPN failed to connect. Verify your configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip($seconds_notification)
     VPNDisconnect
     Remove-Item -Path "$HOME\$credentials_file"
