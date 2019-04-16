@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.0 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.01 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -10,6 +10,11 @@
    https://gist.github.com/jakeballard/11240204
 
    If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
+   
+   TODO:
+   - better block input;
+   - start vpn daemon without popup notifications or supress notifications someway;
+   - don't rely on eternal loop/sleep. discover a way to make gui events be immediatily handled;
 #>
 
 #connection data - leave empty to use the values from default connection
@@ -19,7 +24,7 @@ $vpngroup = ""
 #configs
 $vpnclipath = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $default_preferences_file = "$HOME\AppData\Local\Cisco\Cisco AnyConnect Secure Mobility Client\preferences.xml"
-$credentials_file = "cred.txt"
+$credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
@@ -158,7 +163,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 #Check for previous saved password
 if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
-   $cred = Get-Credential -UserName $vpnuser -Message "Enter you username and password. Those data will be stored at you home folder using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten inside the script.`r`n`r`nUrl: $vpnurl `r`nGroup: $vpngroup"
+   $cred = Get-Credential -UserName $vpnuser -Message "Enter you username and password. The password will be stored at you home folder using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten with variables inside the script.`r`n`r`nUrl: $vpnurl `r`nGroup: $vpngroup"
    if(!$cred)
    {
      Exit
@@ -304,15 +309,30 @@ while ($true)
         $OutputStatus = (.\vpncli.exe status) | Out-String
         $balloon.Text = "Last status check: " + (get-date).ToString('T')
 
-        if ((select-string -pattern "state: Connected" -InputObject $OutputStatus) -and 
-           (($global:retry -ne 0) -or ($global:reconnect -ne 0)))
+        if (select-string -pattern "state: Connected" -InputObject $OutputStatus)
         {
-            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connected)
-            $global:retry = 0
-            $global:reconnect = 0
-            $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
-            $balloon.BalloonTipText = 'VPN successfully re-connected'
-            $balloon.ShowBalloonTip($seconds_notification)
+            if(($global:retry -ne 0) -or ($global:reconnect -ne 0))
+            {
+               $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connected)
+               $global:retry = 0
+               $global:reconnect = 0
+               $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
+               $balloon.BalloonTipText = 'VPN successfully re-connected'
+               $balloon.ShowBalloonTip($seconds_notification)
+            }
+        }
+        elseif(select-string -pattern "state: Reconnecting" -InputObject $OutputStatus)
+        {
+           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
+
+           if(($global:reconnect%10) -eq 0)
+           {
+               $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
+               $balloon.BalloonTipText = 'Connection lost. Trying to reconnect.'
+               $balloon.ShowBalloonTip($seconds_notification)
+           }
+
+           $global:reconnect++
         }
         elseif(select-string -pattern "state: Disconnected" -InputObject $OutputStatus)
         {
@@ -341,19 +361,6 @@ while ($true)
 
            $global:retry++
            VPNConnect
-        }
-        elseif(select-string -pattern "state: Reconnecting" -InputObject $OutputStatus)
-        {
-           $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
-
-           if(($global:reconnect%10) -eq 0)
-           {
-               $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
-               $balloon.BalloonTipText = 'Connection lost. Trying to reconnect.'
-               $balloon.ShowBalloonTip($seconds_notification)
-           }
-
-           $global:reconnect++
         }
     }
 
