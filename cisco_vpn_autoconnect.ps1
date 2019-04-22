@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.01 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.02 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -12,17 +12,18 @@
    If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
    
    TODO:
-   - better block input;
+   - better block user input during connection;
    - start vpn daemon without popup notifications or supress notifications someway;
-   - don't rely on eternal loop/sleep. discover a way to make gui events be immediatily handled;
+   - don't rely on eternal loop/sleep. discover a way to make gui events to be immediatily handled;
+   - give the process a relevant name and not Windows PowerShell
 #>
 
 #connection data - leave empty to use the values from default connection
-$vpnurl = ""
-$vpngroup = ""
+$vpn_url = ""
+$vpn_group = ""
 
 #configs
-$vpnclipath = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
+$vpncli_path = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $default_preferences_file = "$HOME\AppData\Local\Cisco\Cisco AnyConnect Secure Mobility Client\preferences.xml"
 $credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
@@ -31,11 +32,11 @@ $seconds_notification = 3
 $seconds_main_loop = 5
 
 #icons
-$ico_connecting = $vpnclipath + "\res\transition_1.ico"
-$ico_idle = $vpnclipath + "\res\GUI.ico"
-$ico_connected = $vpnclipath + "\res\vpn_connected.ico"
-$ico_error = $vpnclipath + "\res\error.ico"
-$ico_warning = $vpnclipath + "\res\attention.ico"
+$ico_connecting = $vpncli_path + "\res\transition_1.ico"
+$ico_idle = $vpncli_path + "\res\GUI.ico"
+$ico_connected = $vpncli_path + "\res\vpn_connected.ico"
+$ico_error = $vpncli_path + "\res\error.ico"
+$ico_warning = $vpncli_path + "\res\attention.ico"
 
 #Import assembly to use send keys
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -64,11 +65,11 @@ if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and 
 }
 
 #Validate/treat variables
-if(![System.IO.File]::Exists("$vpnclipath\vpncli.exe")){
-   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpnclipath)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
+if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe")){
+   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpncli_path)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
    Exit
 }
-if(!$vpnurl -or !$vpngroup)
+if(!$vpn_url -or !$vpn_group)
 {
    if(![System.IO.File]::Exists($default_preferences_file))
    {
@@ -78,11 +79,11 @@ if(!$vpnurl -or !$vpngroup)
 
    $preferences = [xml](Get-Content $default_preferences_file)
 
-   $vpnurl = $preferences.AnyConnectPreferences.DefaultHostName
-   $vpnuser = $preferences.AnyConnectPreferences.DefaultUser
-   $vpngroup = $preferences.AnyConnectPreferences.DefaultGroup
+   $vpn_url = $preferences.AnyConnectPreferences.DefaultHostName
+   $vpn_user = $preferences.AnyConnectPreferences.DefaultUser
+   $vpn_group = $preferences.AnyConnectPreferences.DefaultGroup
 
-   if(!$vpnurl -or !$vpngroup)
+   if(!$vpn_url -or !$vpn_group)
    {
       [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
       Exit
@@ -92,7 +93,7 @@ if(!$vpnurl -or !$vpngroup)
 #Functions
 Function VPNConnect()
 {
-    Start-Process -FilePath "$vpnclipath\vpncli.exe" -ArgumentList "connect $vpnurl" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
+    Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
     $counter = 0;
     while($counter++ -lt $seconds_connection_fail)
     {
@@ -122,10 +123,10 @@ Function VPNConnect()
            [void] [WinFunc]::BlockInput($true)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
-              [System.Windows.Forms.SendKeys]::SendWait("$vpngroup{Enter}")
+              [System.Windows.Forms.SendKeys]::SendWait("$vpn_group{Enter}")
            }
-           [System.Windows.Forms.SendKeys]::SendWait("$vpnuser{Enter}")
-           [System.Windows.Forms.SendKeys]::SendWait("$vpnpass{Enter}")
+           [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
+           [System.Windows.Forms.SendKeys]::SendWait("$vpn_pass{Enter}")
            [void] [WinFunc]::BlockInput($false)
 
            #wait for connection
@@ -163,7 +164,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 
 #Check for previous saved password
 if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
-   $cred = Get-Credential -UserName $vpnuser -Message "Enter you username and password. The password will be stored at you home folder using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten with variables inside the script.`r`n`r`nUrl: $vpnurl `r`nGroup: $vpngroup"
+   $cred = Get-Credential -UserName $vpn_user -Message "Enter you username and password. The password will be stored using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten with variables inside the script.`r`n`r`nUrl: $vpn_url `r`nGroup: $vpn_group"
    if(!$cred)
    {
      Exit
@@ -172,8 +173,8 @@ if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
    $cred = @{
     user = $cred.UserName
     pass = $cred.Password | ConvertFrom-SecureString
-    url = $vpnurl
-    group = $vpngroup
+    url = $vpn_url
+    group = $vpn_group
    }
 }
 
@@ -195,10 +196,10 @@ else
    $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
 }
 $cred.pass = $cred.pass | ConvertTo-SecureString
-$vpnuser = $cred.user
-$vpnpass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred.pass))))
-$vpnurl = $cred.url
-$vpngroup = $cred.group
+$vpn_user = $cred.user
+$vpn_pass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred.pass))))
+$vpn_url = $cred.url
+$vpn_group = $cred.group
 
 #Set control variables
 $global:retry = 0
@@ -269,7 +270,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
 
 #Set working path
-Set-Location $vpnclipath
+Set-Location $vpncli_path
 
 #create the connection
 VPNDisconnect
