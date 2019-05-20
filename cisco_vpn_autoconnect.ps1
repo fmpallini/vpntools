@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.03 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.04 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -12,7 +12,6 @@
    If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
    
    TODO:
-   - better block user input during connection;
    - start vpn daemon without popup notifications or supress notifications someway;
    - don't rely on eternal loop/sleep. discover a way to make gui events to be immediatily handled;
    - give the process a relevant name and not Windows PowerShell
@@ -54,6 +53,10 @@ Add-Type @'
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool BlockInput(bool fBlockIt);
+
+     [DllImport("user32.dll")]
+     [return: MarshalAs(UnmanagedType.Bool)]
+     public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
   }
 '@ -ErrorAction Stop
 
@@ -119,14 +122,16 @@ Function VPNConnect()
 
         if($window)
         {
-           [void] [WinFunc]::SetForegroundWindow($window)
            [void] [WinFunc]::BlockInput($true)
+           [void] [WinFunc]::ShowWindowAsync($window,1)
+           [void] [WinFunc]::SetForegroundWindow($window)
            if (select-string -pattern "Group:" -InputObject $last_line)
            {
               [System.Windows.Forms.SendKeys]::SendWait("$vpn_group{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
            [System.Windows.Forms.SendKeys]::SendWait("$vpn_pass{Enter}")
+           [void] [WinFunc]::ShowWindowAsync($window,6)
            [void] [WinFunc]::BlockInput($false)
 
            #wait for connection
