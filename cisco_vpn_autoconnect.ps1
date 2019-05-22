@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.04 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.05 - To use with AnyConnect 3.1.x or 4.5.x
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN Connected through a powershell background script.
@@ -72,19 +72,17 @@ if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe")){
    [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpncli_path)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
    Exit
 }
+
 if(!$vpn_url -or !$vpn_group)
 {
-   if(![System.IO.File]::Exists($default_preferences_file))
+   if([System.IO.File]::Exists($default_preferences_file))
    {
-      [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
-      Exit
+      $preferences = [xml](Get-Content $default_preferences_file)
+
+      $vpn_url = $preferences.AnyConnectPreferences.DefaultHostName
+      $vpn_user = $preferences.AnyConnectPreferences.DefaultUser
+      $vpn_group = $preferences.AnyConnectPreferences.DefaultGroup
    }
-
-   $preferences = [xml](Get-Content $default_preferences_file)
-
-   $vpn_url = $preferences.AnyConnectPreferences.DefaultHostName
-   $vpn_user = $preferences.AnyConnectPreferences.DefaultUser
-   $vpn_group = $preferences.AnyConnectPreferences.DefaultGroup
 
    if(!$vpn_url -or !$vpn_group)
    {
@@ -130,7 +128,8 @@ Function VPNConnect()
               [System.Windows.Forms.SendKeys]::SendWait("$vpn_group{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
-           [System.Windows.Forms.SendKeys]::SendWait("$vpn_pass{Enter}")
+           [System.Windows.Forms.SendKeys]::SendWait([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)))
+           [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
            [void] [WinFunc]::ShowWindowAsync($window,6)
            [void] [WinFunc]::BlockInput($false)
 
@@ -199,9 +198,8 @@ else
 {
    $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
 }
-$cred.pass = $cred.pass | ConvertTo-SecureString
 $vpn_user = $cred.user
-$vpn_pass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((($cred.pass))))
+$vpn_pass = $cred.pass | ConvertTo-SecureString
 $vpn_url = $cred.url
 $vpn_group = $cred.group
 
