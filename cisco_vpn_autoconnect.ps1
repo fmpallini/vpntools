@@ -1,27 +1,28 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.06 - To use with AnyConnect 3.1.x or 4.5.x
+   CISCO VPN Auto Reconnect Script - version 2.07
+   Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
-   This script should self-elevate and maintain the VPN Connected through a powershell background script.
-   You can seamsly pause/resume the connection with a simple right button click on tray icon, and better without the need to type your password.
+   This script should self-elevate and maintain the VPN connection through a PowerShell background script.
+   You can seamlessly pause/resume the connection with a simple right button click on the tray icon, suspend/awake your PC and better of all... without the need to re-type your password.
 
-   Some code snippets:
+   Some used code snippets:
    https://gist.github.com/jhorsman/88321511ce4f416c0605
    https://gist.github.com/jakeballard/11240204
 
-   If your connection is failing, try connecting manually by calling 'vpncli.exe connect vpnname' command and analysing what inputs your vpn is asking.
-   
+   If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
+
    TODO:
-   - start vpn daemon without popup notifications or supress notifications someway;
-   - don't rely on eternal loop/sleep. discover a way to make gui events to be immediatily handled;
-   - give the process a relevant name and not Windows PowerShell
+   - Suppress VPN's Daemon popup notifications or suppress its notifications someway;
+   - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
+   - Bypass Windows PowerShell name at process manager;
 #>
 
-#connection data - leave empty to use the values from default connection
+#Connection data - leave empty to use the values from default connection
 $vpn_url = ""
 $vpn_group = ""
 
-#configs
+#Configs
 $vpncli_path = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility Client" #without ending \
 $default_preferences_file = "$HOME\AppData\Local\Cisco\Cisco AnyConnect Secure Mobility Client\preferences.xml"
 $credentials_file = "vpn_credentials.txt"
@@ -29,8 +30,9 @@ $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
 $seconds_main_loop = 5
+$stop_vpn_daemon = $true
 
-#icons
+#Icons
 $ico_connecting = $vpncli_path + "\res\transition_1.ico"
 $ico_idle = $vpncli_path + "\res\GUI.ico"
 $ico_connected = $vpncli_path + "\res\vpn_connected.ico"
@@ -59,37 +61,6 @@ Add-Type @'
      public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
   }
 '@ -ErrorAction Stop
-
-#Avoid duplicated instances
-if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
-{
-   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
-}
-
-#Validate/treat variables
-if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe")){
-   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpncli_path)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
-   Exit
-}
-
-if(!$vpn_url -or !$vpn_group)
-{
-   if([System.IO.File]::Exists($default_preferences_file))
-   {
-      $preferences = [xml](Get-Content $default_preferences_file)
-
-      $vpn_url = $preferences.AnyConnectPreferences.DefaultHostName
-      $vpn_user = $preferences.AnyConnectPreferences.DefaultUser
-      $vpn_group = $preferences.AnyConnectPreferences.DefaultGroup
-   }
-
-   if(!$vpn_url -or !$vpn_group)
-   {
-      [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
-      Exit
-   }
-}
 
 #Functions
 Function VPNConnect()
@@ -163,11 +134,40 @@ Function VPNDisconnect()
    Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
-#Check if its admin
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')
+#Avoid duplicated instances
+if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+{
+   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
+#Validate/treat variables
+if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe"))
+{
+   [System.Windows.Forms.MessageBox]::Show("vpncli.exe not found. Check your path variable.`n`n$($vpncli_path)\vpncli.exe", 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
+if(!$vpn_url -or !$vpn_group)
+{
+   if([System.IO.File]::Exists($default_preferences_file))
+   {
+      $preferences = [xml](Get-Content $default_preferences_file)
+
+      $vpn_url = $preferences.AnyConnectPreferences.DefaultHostName
+      $vpn_user = $preferences.AnyConnectPreferences.DefaultUser
+      $vpn_group = $preferences.AnyConnectPreferences.DefaultGroup
+   }
+
+   if(!$vpn_url -or !$vpn_group)
+   {
+      [System.Windows.Forms.MessageBox]::Show("Default connection data not found. Please fill the values inside the script.", 'VPN Connection', 'Ok', 'Warning')
+      Exit
+   }
+}
 
 #Check for previous saved password
-if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
+if(![System.IO.File]::Exists("$HOME\$credentials_file")){
    $cred = Get-Credential -UserName $vpn_user -Message "Enter you username and password. The password will be stored using SecureString (DPAPI). The URL and Group values are extracted from the default AnyConnect connection but can be overwritten with variables inside the script.`r`n`r`nUrl: $vpn_url `r`nGroup: $vpn_group"
    if(!$cred)
    {
@@ -180,25 +180,23 @@ if(![System.IO.File]::Exists("$HOME\$credentials_file") -and $isAdmin){
     url = $vpn_url
     group = $vpn_group
    }
-}
-
-#Self-elevate the script if required
-if (-Not $isAdmin) {
- if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
-  $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
-  Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Hidden -ArgumentList $CommandLine
-  Exit
- }
-}
-
-#Use or Generate Credentials file
-if(![System.IO.File]::Exists("$HOME\$credentials_file")){
+   
    $cred | ConvertTo-Json | Set-Content -Path "$HOME\$credentials_file"
 }
 else
 {
-   $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
+    $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
 }
+
+#Self-elevate the script if required
+if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+{
+  $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
+  Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Hidden -ArgumentList $CommandLine
+  Exit
+}
+
+#Restore variables from JSON Object
 $vpn_user = $cred.user
 $vpn_pass = $cred.pass | ConvertTo-SecureString
 $vpn_url = $cred.url
@@ -257,6 +255,10 @@ $objMenuItem.add_Click({
    start-sleep -seconds $seconds_notification
    $balloon.Visible = $false
    $balloon.Dispose()
+   if($stop_vpn_daemon)
+   {
+      Invoke-Expression -Command "net stop vpnagent"
+   }
    Stop-Process -Id $pid;
 
 })
@@ -276,7 +278,8 @@ Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem, preferences, def
 #Set working path
 Set-Location $vpncli_path
 
-#create the connection
+#create the initial connection
+Invoke-Expression -Command "net start vpnagent"
 VPNDisconnect
 VPNConnect
 
@@ -301,12 +304,14 @@ else
     start-sleep -seconds $seconds_notification
     $balloon.Visible = $false
     $balloon.Dispose()
-    exit
+    if($stop_vpn_daemon)
+    {
+       Invoke-Expression -Command "net stop vpnagent"
+    }
+    Exit
 }
 
-#Force GC before main loop
-[System.GC]::Collect()
-
+#Main loop
 while ($true)
 {
     if($global:pause -eq 0)
@@ -361,7 +366,11 @@ while ($true)
                Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
-               exit
+               if($stop_vpn_daemon)
+               {
+                  Invoke-Expression -Command "net stop vpnagent"
+               }
+               Exit
            }
 
            $global:retry++
