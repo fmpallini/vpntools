@@ -30,10 +30,10 @@ $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
 $seconds_main_loop = 5
-$stop_vpn_daemon = $true
+$stop_vpn_daemon_on_exit = $true
 
 #Icons
-$ico_connecting = $vpncli_path + "\res\transition_1.ico"
+$ico_transition = $vpncli_path + "\res\transition_1.ico"
 $ico_idle = $vpncli_path + "\res\GUI.ico"
 $ico_connected = $vpncli_path + "\res\vpn_connected.ico"
 $ico_error = $vpncli_path + "\res\error.ico"
@@ -209,7 +209,7 @@ $global:pause = 0
 
 #Create the notification tray icon
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
-$balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
+$balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
 $balloon.BalloonTipTitle = "VPN Connection"
 register-objectevent $balloon BalloonTipClicked BalloonClicked_event -Action {Start-Process -FilePath "notepad.exe" -ArgumentList "$HOME\$connection_stdout" }
 $balloon.Visible = $true
@@ -221,7 +221,7 @@ $objMenuItem.Index = 1
 $objMenuItem.Text = "Pause/Resume"
 $objMenuItem.add_Click({
 
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
+    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
 
     if($global:pause -eq 0)
     {
@@ -256,7 +256,7 @@ $objMenuItem.add_Click({
    start-sleep -seconds $seconds_notification
    $balloon.Visible = $false
    $balloon.Dispose()
-   if($stop_vpn_daemon)
+   if($stop_vpn_daemon_on_exit)
    {
       Invoke-Expression -Command "net stop vpnagent"
    }
@@ -305,7 +305,7 @@ else
     start-sleep -seconds $seconds_notification
     $balloon.Visible = $false
     $balloon.Dispose()
-    if($stop_vpn_daemon)
+    if($stop_vpn_daemon_on_exit)
     {
        Invoke-Expression -Command "net stop vpnagent"
     }
@@ -367,7 +367,7 @@ while ($true)
                Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
-               if($stop_vpn_daemon)
+               if($stop_vpn_daemon_on_exit)
                {
                   Invoke-Expression -Command "net stop vpnagent"
                }
