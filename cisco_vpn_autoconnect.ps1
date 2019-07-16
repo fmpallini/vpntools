@@ -221,7 +221,7 @@ $objMenuItem.Index = 1
 $objMenuItem.Text = "Pause/Resume"
 $objMenuItem.add_Click({
 
-    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
+    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connecting)
 
     if($global:pause -eq 0)
     {
@@ -229,6 +229,7 @@ $objMenuItem.add_Click({
        start-sleep -seconds $seconds_main_loop
        VPNDisconnect
        $balloon.Text = "Connection paused on: " + (get-date).ToString('T')
+       $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
     }
     else
     {
