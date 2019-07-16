@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.07
+   CISCO VPN Auto Reconnect Script - version 2.08
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -134,13 +134,6 @@ Function VPNDisconnect()
    Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
-#Avoid duplicated instances
-if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
-{
-   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
-}
-
 #Validate/treat variables
 if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe"))
 {
@@ -194,6 +187,13 @@ if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::
   $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
   Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Hidden -ArgumentList $CommandLine
   Exit
+}
+
+#Avoid duplicated instances
+if(get-wmiobject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+{
+   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
 }
 
 #Restore variables from JSON Object
@@ -273,7 +273,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
 #clear unused variables
-Remove-Variable isAdmin, Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
+Remove-Variable Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
 
 #Set working path
 Set-Location $vpncli_path
