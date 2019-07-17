@@ -13,7 +13,7 @@
    If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
 
    TODO:
-   - Suppress VPN's Daemon popup notifications or suppress its notifications someway;
+   - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
    - Bypass Windows PowerShell name at process manager;
 #>
@@ -265,11 +265,11 @@ $objMenuItem.add_Click({
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
 $balloon.ContextMenu = $objContextMenu
 
-#Terminate all other vpnui/vpncli processes.
+#Terminate all other vpnui/vpncli processes
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui" -or $_.ProcessName.ToLower() -eq "vpncli")
 {$Id = $_.Id; Stop-Process $Id;}}
 
-#clear unused variables
+#Clear unused variables
 Remove-Variable Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
 
 #Set working path
@@ -280,7 +280,7 @@ Invoke-Expression -Command "net start vpnagent"
 VPNDisconnect
 VPNConnect
 
-# check the sucess of the connection and go on or exit
+#Check the success of the connection
 $outputStatus = (.\vpncli.exe status) | Out-String
 
 if(Select-String -pattern "state: Connected" -InputObject $outputStatus)
