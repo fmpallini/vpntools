@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.10
+   CISCO VPN Auto Reconnect Script - version 2.11
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -29,8 +29,8 @@ $credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
-$seconds_main_loop = 8
-$stop_vpn_daemon_on_exit = $true
+$seconds_main_loop = 10
+$stop_vpn_daemon_on_exit = $false
 
 #Icons
 $ico_transition = $vpncli_path + "\res\transition_1.ico"
@@ -211,7 +211,6 @@ $global:pause = $false
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
 $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
 $balloon.BalloonTipTitle = "VPN Connection"
-register-objectevent $balloon BalloonTipClicked BalloonClicked_event -Action {Start-Process -FilePath "notepad.exe" -ArgumentList "$HOME\$connection_stdout" }
 $balloon.Visible = $true
 
 #Create the context menu
@@ -226,7 +225,6 @@ $objMenuItem.add_Click({
     if($global:pause -eq $false)
     {
        $global:pause = $true
-       Start-Sleep -seconds $seconds_main_loop
        VPNDisconnect
        $balloon.Text = "Connection paused on: " + (get-date).ToString('T')
        $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_idle)
@@ -247,13 +245,7 @@ $objMenuItem.add_Click({
 
    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
    $global:pause = $true
-   Start-Sleep -seconds $seconds_main_loop
    VPNDisconnect
-
-   $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
-   $balloon.BalloonTipText = 'VPN disconnect and script terminated.'
-   $balloon.ShowBalloonTip($seconds_notification)
-   Start-Sleep -seconds $seconds_notification
    $balloon.Visible = $false
    $balloon.Dispose()
    if($stop_vpn_daemon_on_exit)
@@ -263,6 +255,39 @@ $objMenuItem.add_Click({
    Stop-Process -Id $pid;
 })
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
+
+
+$objMenuItem = New-Object System.Windows.Forms.MenuItem
+$objMenuItem.Index = 3
+$objMenuItem.Text = "More..."
+
+$objMenuItemSub = New-Object System.Windows.Forms.MenuItem
+$objMenuItemSub.Index = 1
+$objMenuItemSub.Text = "Show last connection log"
+$objMenuItemSub.add_Click({
+   Start-Process -FilePath "notepad.exe" -ArgumentList "$HOME\$connection_stdout"
+})
+$objMenuItem.MenuItems.Add($objMenuItemSub) | Out-Null
+
+$objMenuItemSub = New-Object System.Windows.Forms.MenuItem
+$objMenuItemSub.Index = 2
+$objMenuItemSub.Text = "Clear credentials and Exit"
+$objMenuItemSub.add_Click({
+   $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
+   $global:pause = $true
+   VPNDisconnect
+   $balloon.Visible = $false
+   $balloon.Dispose()
+   if($stop_vpn_daemon_on_exit)
+   {
+      Invoke-Expression -Command "net stop vpnagent"
+   }
+   Remove-Item -Path "$HOME\$credentials_file"
+   Stop-Process -Id $pid;
+})
+$objMenuItem.MenuItems.Add($objMenuItemSub) | Out-Null
+$objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
+
 $balloon.ContextMenu = $objContextMenu
 
 #Terminate all other vpnui/vpncli processes
@@ -270,7 +295,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui" -or $_.Pro
 {$Id = $_.Id; Stop-Process $Id;}}
 
 #Clear unused variables
-Remove-Variable Id, cred, objContextMenu, objMenuItem, preferences, default_preferences_file
+Remove-Variable Id, cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file
 
 #Set working path
 Set-Location $vpncli_path
@@ -358,7 +383,6 @@ while ($true)
                $balloon.BalloonTipText = 'VPN connection failed for 3 times in a row. Verify your configurations/credentials. Terminating PowerShell Script.'
                $balloon.ShowBalloonTip($seconds_notification)
                VPNDisconnect
-               Start-Sleep -seconds $seconds_notification
                Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
