@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.11
+   CISCO VPN Auto Reconnect Script - version 2.12
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -30,7 +30,6 @@ $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 20
 $seconds_notification = 3
 $seconds_main_loop = 10
-$stop_vpn_daemon_on_exit = $false
 
 #Icons
 $ico_transition = $vpncli_path + "\res\transition_1.ico"
@@ -248,10 +247,6 @@ $objMenuItem.add_Click({
    VPNDisconnect
    $balloon.Visible = $false
    $balloon.Dispose()
-   if($stop_vpn_daemon_on_exit)
-   {
-      Invoke-Expression -Command "net stop vpnagent"
-   }
    Stop-Process -Id $pid;
 })
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
@@ -278,10 +273,6 @@ $objMenuItemSub.add_Click({
    VPNDisconnect
    $balloon.Visible = $false
    $balloon.Dispose()
-   if($stop_vpn_daemon_on_exit)
-   {
-      Invoke-Expression -Command "net stop vpnagent"
-   }
    Remove-Item -Path "$HOME\$credentials_file"
    Stop-Process -Id $pid;
 })
@@ -326,10 +317,6 @@ else
     Start-Sleep -seconds $seconds_notification
     $balloon.Visible = $false
     $balloon.Dispose()
-    if($stop_vpn_daemon_on_exit)
-    {
-       Invoke-Expression -Command "net stop vpnagent"
-    }
     Exit
 }
 
@@ -386,10 +373,6 @@ while ($true)
                Remove-Item -Path "$HOME\$credentials_file"
                $balloon.Visible = $false
                $balloon.Dispose()
-               if($stop_vpn_daemon_on_exit)
-               {
-                  Invoke-Expression -Command "net stop vpnagent"
-               }
                Exit
            }
 
