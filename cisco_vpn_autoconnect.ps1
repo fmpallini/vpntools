@@ -292,7 +292,6 @@ Remove-Variable Id, cred, objContextMenu, objMenuItem, objMenuItemSub, preferenc
 Set-Location $vpncli_path
 
 #create the initial connection
-Invoke-Expression -Command "net start vpnagent"
 VPNDisconnect
 VPNConnect
 
