@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.12
+   CISCO VPN Auto Reconnect Script - version 2.13
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -283,10 +283,10 @@ $balloon.ContextMenu = $objContextMenu
 
 #Terminate all other vpnui/vpncli processes
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui" -or $_.ProcessName.ToLower() -eq "vpncli")
-{$Id = $_.Id; Stop-Process $Id;}}
+{ Stop-Process $_.Id;}}
 
 #Clear unused variables
-Remove-Variable Id, cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file
+Remove-Variable cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file
 
 #Set working path
 Set-Location $vpncli_path
