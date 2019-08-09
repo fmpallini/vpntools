@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.13
+   CISCO VPN Auto Reconnect Script - version 2.14
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -98,7 +98,9 @@ Function VPNConnect()
               [System.Windows.Forms.SendKeys]::SendWait("$vpn_group{Enter}")
            }
            [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
-           [System.Windows.Forms.SendKeys]::SendWait([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)))
+           $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
+           [System.Windows.Forms.SendKeys]::SendWait([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass))
+           [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
            [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
            [void] [WinFunc]::ShowWindowAsync($window,6)
            [void] [WinFunc]::BlockInput($false)
@@ -126,7 +128,7 @@ Function VPNConnect()
     }
 
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, process_id
+    Remove-Variable counter, last_line, window, process_id, ptrPass
 }
 
 Function VPNDisconnect()
