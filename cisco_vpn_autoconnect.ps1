@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.14
+   CISCO VPN Auto Reconnect Script - version 2.15
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -65,28 +65,28 @@ Add-Type @'
 Function VPNConnect()
 {
     Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
-    $counter = 0;
+    $counter = 0
     while($counter++ -lt $seconds_connection_fail)
     {
         Start-Sleep -seconds 1
         $last_line = Get-Content "$HOME\$connection_stdout" -Tail 1
         if((Select-String -pattern "Group:" -InputObject $last_line) -or (Select-String -pattern "Username:" -InputObject $last_line))
         {
-          break;
+          break
         }
     }
 
     if($counter -ge $seconds_connection_fail)
     {
-        $process_id = (Get-Process vpncli).Id
+        $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
         if($process_id)
         {
-           Stop-Process $process_id;
+           Stop-Process $process_id -Force
         }
     }
     else
     {
-        $window = (Get-Process vpncli).MainWindowHandle
+        $window = (Get-Process vpncli -ErrorAction SilentlyContinue).MainWindowHandle
 
         if($window)
         {
@@ -108,7 +108,7 @@ Function VPNConnect()
            #wait for connection
            while($counter++ -lt $seconds_connection_fail)
            {
-             $process_id = (Get-Process vpncli).Id
+             $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
              if($process_id)
              {
                Start-Sleep -seconds 1
@@ -119,10 +119,10 @@ Function VPNConnect()
              }
            }
 
-           $process_id = (Get-Process vpncli).Id
+           $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
            if($process_id)
            {
-              Stop-Process $process_id;
+              Stop-Process $process_id -Force
            }
         }
     }
@@ -249,7 +249,7 @@ $objMenuItem.add_Click({
    VPNDisconnect
    $balloon.Visible = $false
    $balloon.Dispose()
-   Stop-Process -Id $pid;
+   Stop-Process $pid -Force
 })
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
 
@@ -276,7 +276,7 @@ $objMenuItemSub.add_Click({
    $balloon.Visible = $false
    $balloon.Dispose()
    Remove-Item -Path "$HOME\$credentials_file"
-   Stop-Process -Id $pid;
+   Stop-Process $pid -Force
 })
 $objMenuItem.MenuItems.Add($objMenuItemSub) | Out-Null
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
@@ -285,7 +285,7 @@ $balloon.ContextMenu = $objContextMenu
 
 #Terminate all other vpnui/vpncli processes
 Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui" -or $_.ProcessName.ToLower() -eq "vpncli")
-{ Stop-Process $_.Id;}}
+{ Stop-Process $_.Id -Force}}
 
 #Clear unused variables
 Remove-Variable cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file
