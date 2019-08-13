@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.15
+   CISCO VPN Auto Reconnect Script - version 2.16
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -17,7 +17,6 @@
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
    - Bypass Windows PowerShell name at process manager;
 #>
-
 #Connection data - leave empty to use the values from default connection
 $vpn_url = ""
 $vpn_group = ""
@@ -136,6 +135,25 @@ Function VPNDisconnect()
    Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
+#Self-elevate the script if required
+if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+{
+  $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
+  $new_instance = Start-Process -FilePath PowerShell.exe -Verb Runas -PassThru -WindowStyle Hidden -ArgumentList $CommandLine
+  if(!$new_instance)
+  {
+    [System.Windows.Forms.MessageBox]::Show('Please accept the elevated privileges request when running the script so it can correctly call the VPN agent.', 'VPN Connection', 'Ok', 'Error')
+  }
+  Exit
+}
+
+#Avoid duplicated instances
+if(Get-WmiObject win32_process | where{$_.processname.ToLower() -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+{
+   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
 #Validate/treat variables
 if(![System.IO.File]::Exists("$vpncli_path\vpncli.exe"))
 {
@@ -183,21 +201,6 @@ else
     $cred = Get-Content -Path "$HOME\$credentials_file" -Raw | ConvertFrom-Json
 }
 
-#Self-elevate the script if required
-if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-{
-  $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
-  Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Hidden -ArgumentList $CommandLine
-  Exit
-}
-
-#Avoid duplicated instances
-if(Get-WmiObject win32_process | where{$_.processname -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
-{
-   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
-}
-
 #Restore variables from JSON Object
 $vpn_user = $cred.user
 $vpn_pass = $cred.pass | ConvertTo-SecureString
@@ -207,6 +210,7 @@ $vpn_group = $cred.group
 #Set control variables
 $global:retry = 0
 $global:pause = $false
+$global:run = $true
 
 #Create the notification tray icon
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
@@ -243,13 +247,11 @@ $objMenuItem = New-Object System.Windows.Forms.MenuItem
 $objMenuItem.Index = 2
 $objMenuItem.Text = "Exit"
 $objMenuItem.add_Click({
-
    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
-   $global:pause = $true
    VPNDisconnect
    $balloon.Visible = $false
    $balloon.Dispose()
-   Stop-Process $pid -Force
+   $global:run = $false
 })
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
 
@@ -271,12 +273,11 @@ $objMenuItemSub.Index = 2
 $objMenuItemSub.Text = "Clear credentials and Exit"
 $objMenuItemSub.add_Click({
    $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_transition)
-   $global:pause = $true
    VPNDisconnect
    $balloon.Visible = $false
    $balloon.Dispose()
    Remove-Item -Path "$HOME\$credentials_file"
-   Stop-Process $pid -Force
+   $global:run = $false
 })
 $objMenuItem.MenuItems.Add($objMenuItemSub) | Out-Null
 $objContextMenu.MenuItems.Add($objMenuItem) | Out-Null
@@ -315,14 +316,13 @@ else
     $balloon.ShowBalloonTip($seconds_notification)
     VPNDisconnect
     Remove-Item -Path "$HOME\$credentials_file"
-    Start-Sleep -seconds $seconds_notification
     $balloon.Visible = $false
     $balloon.Dispose()
     Exit
 }
 
 #Main loop
-while ($true)
+while ($global:run)
 {
     if($global:pause -eq $false)
     {
