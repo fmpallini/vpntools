@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.16
+   CISCO VPN Auto Reconnect Script - version 2.17
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -17,6 +17,7 @@
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
    - Bypass Windows PowerShell name at process manager;
 #>
+
 #Connection data - leave empty to use the values from default connection
 $vpn_url = ""
 $vpn_group = ""
@@ -63,7 +64,7 @@ Add-Type @'
 #Functions
 Function VPNConnect()
 {
-    Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized
+    $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0
     while($counter++ -lt $seconds_connection_fail)
     {
@@ -75,17 +76,9 @@ Function VPNConnect()
         }
     }
 
-    if($counter -ge $seconds_connection_fail)
+    if($counter -lt $seconds_connection_fail)
     {
-        $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
-        if($process_id)
-        {
-           Stop-Process $process_id -Force
-        }
-    }
-    else
-    {
-        $window = (Get-Process vpncli -ErrorAction SilentlyContinue).MainWindowHandle
+        $window = $vpncli.MainWindowHandle
 
         if($window)
         {
@@ -105,29 +98,20 @@ Function VPNConnect()
            [void] [WinFunc]::BlockInput($false)
 
            #wait for connection
-           while($counter++ -lt $seconds_connection_fail)
+           while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
            {
-             $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
-             if($process_id)
-             {
-               Start-Sleep -seconds 1
-             }
-             else
-             {
-               break
-             }
-           }
-
-           $process_id = (Get-Process vpncli -ErrorAction SilentlyContinue).Id
-           if($process_id)
-           {
-              Stop-Process $process_id -Force
+             Start-Sleep -seconds 1
            }
         }
     }
 
+    if(!$vpncli.HasExited)
+    {
+        $vpncli.Kill()
+    }
+
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, process_id, ptrPass
+    Remove-Variable counter, last_line, window, ptrPass, vpncli
 }
 
 Function VPNDisconnect()
@@ -316,6 +300,7 @@ else
     $balloon.ShowBalloonTip($seconds_notification)
     VPNDisconnect
     Remove-Item -Path "$HOME\$credentials_file"
+    Start-Sleep -seconds $seconds_notification
     $balloon.Visible = $false
     $balloon.Dispose()
     Exit
@@ -372,6 +357,7 @@ while ($global:run)
                $balloon.ShowBalloonTip($seconds_notification)
                VPNDisconnect
                Remove-Item -Path "$HOME\$credentials_file"
+               Start-Sleep -seconds $seconds_notification
                $balloon.Visible = $false
                $balloon.Dispose()
                Exit
