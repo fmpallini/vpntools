@@ -118,6 +118,13 @@ Function VPNDisconnect()
    Invoke-Expression -Command ".\vpncli.exe disconnect"
 }
 
+#Avoid duplicated instances
+if(Get-WmiObject win32_process | where{$_.processname.ToLower() -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+{
+   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   Exit
+}
+
 #Self-elevate the script if required
 if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
 {
@@ -128,13 +135,6 @@ if(!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::
     [System.Windows.Forms.MessageBox]::Show('Please accept the elevated privileges request when running the script so it can correctly call the VPN agent.', 'VPN Connection', 'Ok', 'Error')
   }
   Exit
-}
-
-#Avoid duplicated instances
-if(Get-WmiObject win32_process | where{$_.processname.ToLower() -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
-{
-   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
-   Exit
 }
 
 #Validate/treat variables
