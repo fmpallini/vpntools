@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.18
+   CISCO VPN Auto Reconnect Script - version 2.20
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -119,9 +119,18 @@ Function VPNDisconnect()
 }
 
 #Avoid duplicated instances
-if(Get-WmiObject win32_process | where{$_.processname.ToLower() -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+$job = Get-WmiObject win32_process -AsJob | Wait-Job -Timeout 10
+if($job.State -eq "Completed")
 {
-   [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+   if($job | Receive-Job | where{$_.processname.ToLower() -eq 'powershell.exe' -and $_.ProcessId -ne $pid -and $_.commandline -match $($MyInvocation.MyCommand.Path)})
+   {
+      [System.Windows.Forms.MessageBox]::Show('Another instance already running.', 'VPN Connection', 'Ok', 'Warning')
+      Exit
+   }
+}
+else
+{
+   [System.Windows.Forms.MessageBox]::Show('Win32 Process list hanged. Please run the script again.', 'VPN Connection', 'Ok', 'Warning')
    Exit
 }
 
@@ -266,7 +275,7 @@ Get-Process | ForEach-Object {if($_.ProcessName.ToLower() -eq "vpnui" -or $_.Pro
 { Stop-Process $_.Id -Force}}
 
 #Clear unused variables
-Remove-Variable cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file
+Remove-Variable cred, objContextMenu, objMenuItem, objMenuItemSub, preferences, default_preferences_file, job
 
 #Set working path
 Set-Location $vpncli_path
