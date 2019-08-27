@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.20
+   CISCO VPN Auto Reconnect Script - version 2.21
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -30,6 +30,7 @@ $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 15
 $seconds_notification = 3
 $seconds_main_loop = 10
+$number_retries = 2 #remeber that 3 retries with the wrong password could lock out your account
 
 #Icons
 $ico_transition = $vpncli_path + "\res\transition_1.ico"
@@ -341,12 +342,11 @@ while ($global:run)
         {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
-           if($global:retry -lt 3)
+           if($global:retry -lt $number_retries)
            {
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
-               $balloon.BalloonTipText = 'VPN Connection Failed. Retrying in 30 seconds.'
+               $balloon.BalloonTipText = 'VPN not connected. Retrying...'
                $balloon.ShowBalloonTip($seconds_notification)
-               Start-Sleep -seconds 30
                $global:retry++
                VPNConnect
            }
@@ -354,7 +354,7 @@ while ($global:run)
            {
                $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-               $balloon.BalloonTipText = 'VPN connection failed for 3 times in a row. Verify your configurations/credentials. Terminating PowerShell Script.'
+               $balloon.BalloonTipText = 'VPN connection failed for ' + $number_retries + ' times in a row. Verify your configurations/credentials. Terminating PowerShell Script.'
                $balloon.ShowBalloonTip($seconds_notification)
                Remove-Item -Path "$HOME\$credentials_file"
                $global:run = $false
