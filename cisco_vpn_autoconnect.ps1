@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.21
+   CISCO VPN Auto Reconnect Script - version 2.3
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -15,7 +15,7 @@
    TODO:
    - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
-   - Bypass Windows PowerShell name at process manager;
+   - Rename the process name on process manager;
 #>
 
 #Connection data - leave empty to use the values from default connection
@@ -65,6 +65,9 @@ Add-Type @'
 #Functions
 Function VPNConnect()
 {
+    $originalLanguageList = Get-WinUserLanguageList
+    Set-WinUserLanguageList en-US -Force
+
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0
 
@@ -86,7 +89,7 @@ Function VPNConnect()
               }
               [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
               $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
-              [System.Windows.Forms.SendKeys]::SendWait([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass))
+              [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               [void] [WinFunc]::ShowWindowAsync($window,6)
@@ -110,8 +113,10 @@ Function VPNConnect()
         $vpncli.Kill()
     }
 
+    Set-WinUserLanguageList $originalLanguageList -Force
+
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli
+    Remove-Variable counter, last_line, window, ptrPass, vpncli,originalLanguageList
 }
 
 Function VPNDisconnect()
