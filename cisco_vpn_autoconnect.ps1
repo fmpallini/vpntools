@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.3
+   CISCO VPN Auto Reconnect Script - version 2.31
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -65,11 +65,10 @@ Add-Type @'
 #Functions
 Function VPNConnect()
 {
-    $originalLanguageList = Get-WinUserLanguageList
-    Set-WinUserLanguageList en-US -Force
-
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0
+
+    $originalLanguageList = Get-WinUserLanguageList
 
     while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
     {
@@ -80,6 +79,12 @@ Function VPNConnect()
            $window = $vpncli.MainWindowHandle
            if($window)
            {
+
+              $newLanguageList = New-WinUserLanguageList en-US
+              $newLanguageList[0].InputMethodTips.Clear()
+              $newLanguageList[0].InputMethodTips.Add('0409:00000409') # English (United States) - US Qwerty
+              Set-WinUserLanguageList $newLanguageList -Force
+
               [void] [WinFunc]::BlockInput($true)
               [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
@@ -116,7 +121,7 @@ Function VPNConnect()
     Set-WinUserLanguageList $originalLanguageList -Force
 
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli,originalLanguageList
+    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList
 }
 
 Function VPNDisconnect()
