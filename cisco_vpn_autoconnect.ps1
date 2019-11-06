@@ -12,6 +12,8 @@
 
    If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
 
+   Unfortunately, sendKeys sticks to US keyboard layout meaning that sending inputs of special characters could differ if your Windows is running a keyboard layout different from US QWERTY. This script tries to deal with that forcing the keyboard layout to US before starting the inputs and restoring the previous language configurations after that, anyway it doesn't seem to be 100% effective and the process only started to work fully after enabling at "Advanced Keyboard Settings" the toggle "Let me use a different input method for each app window".
+
    TODO:
    - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
