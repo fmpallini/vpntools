@@ -17,7 +17,7 @@
    TODO:
    - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
-   - Rename the process name on process manager;
+   - Rename the process on process manager;
 #>
 
 #Connection data - leave empty to use the values from default connection
