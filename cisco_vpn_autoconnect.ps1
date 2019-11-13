@@ -68,18 +68,18 @@ Add-Type @'
 Function VPNConnect()
 {
     $originalLanguageList = Get-WinUserLanguageList
-    $forceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409')
+    $needToForceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409') # English (United States layout) - US QWERTY
 
-    if($forceUSKeyboardLayout)
+    if($needToForceUSKeyboardLayout)
     {
        $originalUserPreferencesMask = (Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop').'UserPreferencesMask'
-       $newuserPreferencesMask = $originalUserPreferencesMask.Clone()
-       $newuserPreferencesMask[5] = 146 #magic value to enable different apps to use different keyboard layouts
-       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $newuserPreferencesMask
+       $newUserPreferencesMask = $originalUserPreferencesMask.Clone()
+       $newUserPreferencesMask[4] = 146 #magic number to enable different apps to use different keyboard layouts
+       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $newUserPreferencesMask
 
        $newLanguageList = New-WinUserLanguageList en-US
        $newLanguageList[0].InputMethodTips.Clear()
-       $newLanguageList[0].InputMethodTips.Add('0409:00000409') # English (United States) - US Qwerty
+       $newLanguageList[0].InputMethodTips.Add('0409:00000409')
        Set-WinUserLanguageList $newLanguageList -Force
     }
 
@@ -128,14 +128,14 @@ Function VPNConnect()
         $vpncli.Kill()
     }
 
-    if($forceUSKeyboardLayout)
+    if($needToForceUSKeyboardLayout)
     {
-       Set-ItemProperty -Path 'HKCU\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $originalUserPreferencesMask
+       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $originalUserPreferencesMask
        Set-WinUserLanguageList $originalLanguageList -Force
     }
 
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, forceUSKeyboardLayout, originalUserPreferencesMask, newUserPreferencesMask
+    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, needToForceUSKeyboardLayout, originalUserPreferencesMask, newUserPreferencesMask
 }
 
 Function VPNDisconnect()
