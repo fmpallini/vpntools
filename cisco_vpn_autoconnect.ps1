@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.32
+   CISCO VPN Auto Reconnect Script - version 2.33
    Tested with AnyConnect 3.1.x and 4.5.x.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -12,7 +12,7 @@
 
    If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
 
-   Unfortunately, sendKeys sticks to US keyboard layout meaning that sending inputs of special characters could differ if your Windows is running a keyboard layout different from US QWERTY. This script tries to deal with that forcing the keyboard layout to US before starting the inputs and restoring the previous language configurations after that, anyway it doesn't seem to be 100% effective and the process only started to work fully after enabling at "Advanced Keyboard Settings" the toggle "Let me use a different input method for each app window".
+   Unfortunately, sendKeys sticks to US keyboard layout meaning that sending inputs of special characters could differ if your Windows is running a keyboard layout different from US QWERTY. This script tries to deal with that forcing the keyboard layout to US before starting the inputs and restoring the previous language configurations after that.
 
    TODO:
    - Suppress VPN's Daemon popup notifications;
@@ -68,11 +68,20 @@ Add-Type @'
 Function VPNConnect()
 {
     $originalLanguageList = Get-WinUserLanguageList
+    $forceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409')
 
-    $newLanguageList = New-WinUserLanguageList en-US
-    $newLanguageList[0].InputMethodTips.Clear()
-    $newLanguageList[0].InputMethodTips.Add('0409:00000409') # English (United States) - US Qwerty
-    Set-WinUserLanguageList $newLanguageList -Force
+    if($forceUSKeyboardLayout)
+    {
+       $originalUserPreferencesMask = (Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop').'UserPreferencesMask'
+       $newuserPreferencesMask = $originalUserPreferencesMask.Clone()
+       $newuserPreferencesMask[5] = 146 #magic value to enable different apps to use different keyboard layouts
+       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $newuserPreferencesMask
+
+       $newLanguageList = New-WinUserLanguageList en-US
+       $newLanguageList[0].InputMethodTips.Clear()
+       $newLanguageList[0].InputMethodTips.Add('0409:00000409') # English (United States) - US Qwerty
+       Set-WinUserLanguageList $newLanguageList -Force
+    }
 
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0
@@ -119,10 +128,14 @@ Function VPNConnect()
         $vpncli.Kill()
     }
 
-    Set-WinUserLanguageList $originalLanguageList -Force
+    if($forceUSKeyboardLayout)
+    {
+       Set-ItemProperty -Path 'HKCU\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $originalUserPreferencesMask
+       Set-WinUserLanguageList $originalLanguageList -Force
+    }
 
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList
+    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, forceUSKeyboardLayout, originalUserPreferencesMask, newUserPreferencesMask
 }
 
 Function VPNDisconnect()
