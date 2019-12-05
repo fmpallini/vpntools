@@ -1,6 +1,6 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.33
-   Tested with AnyConnect 3.1.x and 4.5.x.
+   CISCO VPN Auto Reconnect Script - version 2.34
+   Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN connection through a PowerShell background script.
@@ -16,7 +16,7 @@
 
    TODO:
    - Suppress VPN's Daemon popup notifications;
-   - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the events handling;
+   - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the GUI events;
    - Rename the process on process manager;
 #>
 
@@ -61,6 +61,9 @@ Add-Type @'
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+     [DllImport("user32.dll")]
+     public static extern int ActivateKeyboardLayout(int hWnd, uint Flags);
   }
 '@ -ErrorAction Stop
 
@@ -68,19 +71,13 @@ Add-Type @'
 Function VPNConnect()
 {
     $originalLanguageList = Get-WinUserLanguageList
-    $needToForceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409') # English (United States layout) - US QWERTY
+    $needToForceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409') # English (United States layout) - US QWERTY so compatible with sendKeys.
 
     if($needToForceUSKeyboardLayout)
     {
-       $originalUserPreferencesMask = (Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop').'UserPreferencesMask'
-       $newUserPreferencesMask = $originalUserPreferencesMask.Clone()
-       $newUserPreferencesMask[4] = 146 #magic number to enable different apps to use different keyboard layouts
-       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $newUserPreferencesMask
-
        $newLanguageList = New-WinUserLanguageList en-US
        $newLanguageList[0].InputMethodTips.Clear()
        $newLanguageList[0].InputMethodTips.Add('0409:00000409')
-       Set-WinUserLanguageList $newLanguageList -Force
     }
 
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
@@ -98,17 +95,33 @@ Function VPNConnect()
               [void] [WinFunc]::BlockInput($true)
               [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
+
+              if($needToForceUSKeyboardLayout)
+              {
+                 Set-WinUserLanguageList $newLanguageList -Force
+                 [void] [WinFunc]::ActivateKeyboardLayout(0,256)
+                 Start-Sleep -seconds 1
+              }
+
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
-                 [System.Windows.Forms.SendKeys]::SendWait("$vpn_group{Enter}")
+                 [System.Windows.Forms.SendKeys]::SendWait(($vpn_group -replace "[+^%~()]", "{`$0}"))
+                 [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               }
-              [System.Windows.Forms.SendKeys]::SendWait("$vpn_user{Enter}")
+              [System.Windows.Forms.SendKeys]::SendWait(($vpn_user -replace "[+^%~()]", "{`$0}"))
+              [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               [void] [WinFunc]::ShowWindowAsync($window,6)
               [void] [WinFunc]::BlockInput($false)
+
+              if($needToForceUSKeyboardLayout)
+              {
+                 Set-WinUserLanguageList $originalLanguageList -Force
+                 [void] [WinFunc]::ActivateKeyboardLayout(0,256)
+              }
 
               #wait for connection
               while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
@@ -127,15 +140,8 @@ Function VPNConnect()
     {
         $vpncli.Kill()
     }
-
-    if($needToForceUSKeyboardLayout)
-    {
-       Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Value $originalUserPreferencesMask
-       Set-WinUserLanguageList $originalLanguageList -Force
-    }
-
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, needToForceUSKeyboardLayout, originalUserPreferencesMask, newUserPreferencesMask
+    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, needToForceUSKeyboardLayout
 }
 
 Function VPNDisconnect()
