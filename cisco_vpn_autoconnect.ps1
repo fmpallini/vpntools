@@ -114,14 +114,15 @@ Function VPNConnect()
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
-              [void] [WinFunc]::ShowWindowAsync($window,6)
-              [void] [WinFunc]::BlockInput($false)
 
               if($needToForceUSKeyboardLayout)
               {
                  Set-WinUserLanguageList $originalLanguageList -Force
                  [void] [WinFunc]::ActivateKeyboardLayout(0,256)
               }
+
+              [void] [WinFunc]::ShowWindowAsync($window,6)
+              [void] [WinFunc]::BlockInput($false)
 
               #wait for connection
               while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
