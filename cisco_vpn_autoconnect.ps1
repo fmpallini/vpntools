@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.34
+   CISCO VPN Auto Reconnect Script - version 2.35
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -12,12 +12,10 @@
 
    If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
 
-   Unfortunately, sendKeys sticks to US keyboard layout meaning that sending inputs of special characters could differ if your Windows is running a keyboard layout different from US QWERTY. This script tries to deal with that forcing the keyboard layout to US before starting the inputs and restoring the previous language configurations after that.
-
    TODO:
    - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the GUI events;
-   - Rename the process on process manager;
+   - Rename somehow the process on process manager;
 #>
 
 #Connection data - leave empty to use the values from default connection
@@ -61,25 +59,12 @@ Add-Type @'
      [DllImport("user32.dll")]
      [return: MarshalAs(UnmanagedType.Bool)]
      public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-
-     [DllImport("user32.dll")]
-     public static extern int ActivateKeyboardLayout(int hWnd, uint Flags);
   }
 '@ -ErrorAction Stop
 
 #Functions
 Function VPNConnect()
 {
-    $originalLanguageList = Get-WinUserLanguageList
-    $needToForceUSKeyboardLayout = -Not($originalLanguageList[0].InputMethodTips[0] -match '0409:00000409') # English (United States layout) - US QWERTY so compatible with sendKeys.
-
-    if($needToForceUSKeyboardLayout)
-    {
-       $newLanguageList = New-WinUserLanguageList en-US
-       $newLanguageList[0].InputMethodTips.Clear()
-       $newLanguageList[0].InputMethodTips.Add('0409:00000409')
-    }
-
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0
 
@@ -96,13 +81,6 @@ Function VPNConnect()
               [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
 
-              if($needToForceUSKeyboardLayout)
-              {
-                 Set-WinUserLanguageList $newLanguageList -Force
-                 [void] [WinFunc]::ActivateKeyboardLayout(0,256)
-                 Start-Sleep -seconds 1
-              }
-
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
                  [System.Windows.Forms.SendKeys]::SendWait(($vpn_group -replace "[+^%~()]", "{`$0}"))
@@ -114,12 +92,6 @@ Function VPNConnect()
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
-
-              if($needToForceUSKeyboardLayout)
-              {
-                 Set-WinUserLanguageList $originalLanguageList -Force
-                 [void] [WinFunc]::ActivateKeyboardLayout(0,256)
-              }
 
               [void] [WinFunc]::ShowWindowAsync($window,6)
               [void] [WinFunc]::BlockInput($false)
@@ -142,7 +114,7 @@ Function VPNConnect()
         $vpncli.Kill()
     }
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli, originalLanguageList, newLanguageList, needToForceUSKeyboardLayout
+    Remove-Variable counter, last_line, window, ptrPass, vpncli
 }
 
 Function VPNDisconnect()
