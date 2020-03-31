@@ -3,10 +3,10 @@
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
-   This script should self-elevate and maintain the VPN connection through a PowerShell background script.
-   You can seamlessly pause/resume the connection with a simple right button click on the tray icon, suspend/awake your PC and better of all... without the need to re-type your password.
+   This script should self-elevate and maintain the VPN connection through a PowerShell background process.
+   You can seamlessly pause/resume the connection with a simple right button click on the tray icon, suspend/awake your PC retaining the connection and better of all... without the need to re-type your password.
 
-   Remember to allow the execution of scripts in PowerShell before trying to run. Eg. 'Set-ExecutionPolicy Unrestricted -Scope CurrentUser'
+   Remember to allow the execution of scripts in PowerShell before trying to run it. Eg. 'Set-ExecutionPolicy Unrestricted -Scope CurrentUser'
 
    Some used code snippets:
    https://gist.github.com/jhorsman/88321511ce4f416c0605
