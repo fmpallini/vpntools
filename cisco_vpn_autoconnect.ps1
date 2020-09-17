@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.35
+   CISCO VPN Auto Reconnect Script - version 2.36
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -31,7 +31,7 @@ $credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 15
 $seconds_notification = 3
-$seconds_main_loop = 10
+$seconds_main_loop = 12
 $number_retries = 2 #remeber that 3 retries with the wrong password could lock out your account
 
 #Icons
@@ -79,21 +79,27 @@ Function VPNConnect()
            $window = $vpncli.MainWindowHandle
            if($window)
            {
-              [void] [WinFunc]::BlockInput($true)
               [void] [WinFunc]::ShowWindowAsync($window,1)
-              [void] [WinFunc]::SetForegroundWindow($window)
 
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
+                 [void] [WinFunc]::BlockInput($true)
+                 [void] [WinFunc]::SetForegroundWindow($window)
                  [System.Windows.Forms.SendKeys]::SendWait(($vpn_group -replace "[+^%~()]", "{`$0}"))
                  [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               }
+
+              [void] [WinFunc]::BlockInput($true)
+              [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(($vpn_user -replace "[+^%~()]", "{`$0}"))
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
+
               $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
+              [void] [WinFunc]::BlockInput($true)
+              [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
-              [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
+              [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
 
               [void] [WinFunc]::ShowWindowAsync($window,6)
               [void] [WinFunc]::BlockInput($false)
@@ -329,6 +335,10 @@ while ($global:run)
                $balloon.BalloonTipText = 'VPN successfully re-connected'
                $balloon.ShowBalloonTip($seconds_notification)
             }
+
+            Start-Sleep -seconds $seconds_main_loop
+            [System.Windows.Forms.Application]::DoEvents()
+
         }
         elseif(Select-String -pattern "state: Reconnecting" -InputObject $outputStatus)
         {
