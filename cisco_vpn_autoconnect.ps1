@@ -29,9 +29,9 @@ $vpncli_path = "${env:ProgramFiles(x86)}\Cisco\Cisco AnyConnect Secure Mobility 
 $default_preferences_file = "$HOME\AppData\Local\Cisco\Cisco AnyConnect Secure Mobility Client\preferences.xml"
 $credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
-$seconds_connection_fail = 15
-$seconds_notification = 3
-$seconds_main_loop = 12
+$seconds_connection_fail = 12
+$seconds_notification = 2
+$seconds_main_loop = 8
 $number_retries = 2 #remeber that 3 retries with the wrong password could lock out your account
 
 #Icons
