@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.36
+   CISCO VPN Auto Reconnect Script - version 2.36a
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -79,23 +79,26 @@ Function VPNConnect()
            $window = $vpncli.MainWindowHandle
            if($window)
            {
-              [void] [WinFunc]::ShowWindowAsync($window,1)
+              (New-Object -ComObject "wscript.shell").SendKeys("^%{ESC}") #avoid start menu opened since it has focus over everyother window
 
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
                  [void] [WinFunc]::BlockInput($true)
+                 [void] [WinFunc]::ShowWindowAsync($window,1)
                  [void] [WinFunc]::SetForegroundWindow($window)
                  [System.Windows.Forms.SendKeys]::SendWait(($vpn_group -replace "[+^%~()]", "{`$0}"))
                  [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               }
 
               [void] [WinFunc]::BlockInput($true)
+              [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(($vpn_user -replace "[+^%~()]", "{`$0}"))
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
 
               $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
               [void] [WinFunc]::BlockInput($true)
+              [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
