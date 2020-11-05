@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.36a
+   CISCO VPN Auto Reconnect Script - version 2.36d
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -68,10 +68,11 @@ Add-Type @'
 Function VPNConnect()
 {
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
-    $counter = 0
+    $counter = 0.0
 
-    while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
+    while($counter -lt $seconds_connection_fail -and !$vpncli.HasExited)
     {
+        $counter = $counter + 0.5
         $last_line = Get-Content "$HOME\$connection_stdout" -Tail 1
 
         if((Select-String -pattern "Group:" -InputObject $last_line) -or (Select-String -pattern "Username:" -InputObject $last_line))
@@ -79,27 +80,24 @@ Function VPNConnect()
            $window = $vpncli.MainWindowHandle
            if($window)
            {
-              (New-Object -ComObject "wscript.shell").SendKeys("^%{ESC}") #avoid start menu opened since it has focus over everyother window
+              [void] [WinFunc]::BlockInput($true)
+
+              $shell = New-Object -ComObject "wscript.shell"
+              $shell.SendKeys("^%{ESC}") #closes start menu if opened since it has focus priority over every other window
+
+              [void] [WinFunc]::ShowWindowAsync($window,1)
+              [void] [WinFunc]::SetForegroundWindow($window)
 
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
-                 [void] [WinFunc]::BlockInput($true)
-                 [void] [WinFunc]::ShowWindowAsync($window,1)
-                 [void] [WinFunc]::SetForegroundWindow($window)
                  [System.Windows.Forms.SendKeys]::SendWait(($vpn_group -replace "[+^%~()]", "{`$0}"))
                  [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               }
 
-              [void] [WinFunc]::BlockInput($true)
-              [void] [WinFunc]::ShowWindowAsync($window,1)
-              [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(($vpn_user -replace "[+^%~()]", "{`$0}"))
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
 
               $ptrPass = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($vpn_pass)
-              [void] [WinFunc]::BlockInput($true)
-              [void] [WinFunc]::ShowWindowAsync($window,1)
-              [void] [WinFunc]::SetForegroundWindow($window)
               [System.Windows.Forms.SendKeys]::SendWait(([Runtime.InteropServices.Marshal]::PtrToStringAuto($ptrPass) -replace "[+^%~()]", "{`$0}"))
               [System.Windows.Forms.SendKeys]::SendWait("{Enter}")
               [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptrPass)
@@ -108,15 +106,16 @@ Function VPNConnect()
               [void] [WinFunc]::BlockInput($false)
 
               #wait for connection
-              while($counter++ -lt $seconds_connection_fail -and !$vpncli.HasExited)
+              while($counter -lt $seconds_connection_fail -and !$vpncli.HasExited)
               {
-                Start-Sleep -seconds 1
+                $counter = $counter + 0.5
+                Start-Sleep -Milliseconds 500
               }
            }
         }
         else
         {
-           Start-Sleep -seconds 1
+           Start-Sleep -Milliseconds 500
         }
     }
 
@@ -125,7 +124,7 @@ Function VPNConnect()
         $vpncli.Kill()
     }
     "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli
+    Remove-Variable counter, last_line, window, ptrPass, vpncli, shell
 }
 
 Function VPNDisconnect()
