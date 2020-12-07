@@ -1,12 +1,14 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.36d
+   CISCO VPN Auto Reconnect Script - version 2.36f
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
    This script should self-elevate and maintain the VPN connection through a PowerShell background process.
    You can seamlessly pause/resume the connection with a simple right button click on the tray icon, suspend/awake your PC retaining the connection and better of all... without the need to re-type your password.
 
-   Remember to allow the execution of scripts in PowerShell before trying to run it. Eg. 'Set-ExecutionPolicy Unrestricted -Scope CurrentUser'
+   - Remember to allow the execution of scripts in PowerShell before trying to run it. Eg. 'Set-ExecutionPolicy Unrestricted -Scope CurrentUser';
+   - After a download, Windows 10 requires to unblock potential malicious files as PowerShell scripts, you can do this under the General tab of file properties (right mouse click on the file -> properties), and then checking the unblock checkbox;
+   - Associate .ps1 files with PowerShell so you can double click it (C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe);
 
    Some used code snippets:
    https://gist.github.com/jhorsman/88321511ce4f416c0605
