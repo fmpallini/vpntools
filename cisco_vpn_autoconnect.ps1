@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.36f
+   CISCO VPN Auto Reconnect Script - version 2.40
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -14,12 +14,12 @@
    https://gist.github.com/jhorsman/88321511ce4f416c0605
    https://gist.github.com/jakeballard/11240204
 
-   If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what inputs your VPN is answering.
+   If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what outputs your VPN is answering.
 
    TODO:
    - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the GUI events;
-   - Rename somehow the process on process manager;
+   - Rename somehow the powershell process on Windows process manager;
 #>
 
 #Connection data - leave empty to use the values from default connection
@@ -33,7 +33,7 @@ $credentials_file = "vpn_credentials.txt"
 $connection_stdout = "vpn_stdout.txt"
 $seconds_connection_fail = 12
 $seconds_notification = 2
-$seconds_main_loop = 8
+$seconds_main_loop = 6 # reduce for more responsiveness and faster connection state check in counterpart with higher CPU cycles usage
 $number_retries = 2 #remeber that 3 retries with the wrong password could lock out your account
 
 #Icons
@@ -69,6 +69,11 @@ Add-Type @'
 #Functions
 Function VPNConnect()
 {
+    if((Get-NetConnectionProfile).IPv4Connectivity -notcontains "Internet")
+    {   
+        return
+    }
+
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
     $counter = 0.0
 
@@ -218,7 +223,8 @@ $vpn_group = $cred.group
 #Set control variables
 $global:retry = 0
 $global:pause = $false
-$global:run = $true
+$global:run = $false
+$global:internet = $true
 
 #Create the notification tray icon
 $global:balloon = New-Object System.Windows.Forms.NotifyIcon
@@ -309,16 +315,16 @@ if(Select-String -pattern "state: Connected" -InputObject $outputStatus)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
     $balloon.BalloonTipText = 'VPN successfully connected.'
     $balloon.ShowBalloonTip($seconds_notification)
+	$global:run = $true
 }
 else
 {
     $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_error)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Error 
-    $balloon.BalloonTipText = 'VPN failed to connect. Verify your configurations/credentials. Terminating PowerShell Script.'
+    $balloon.BalloonTipText = 'VPN failed to connect. Verify your internet connection and the VPN configurations/credentials. Terminating PowerShell Script.'
     $balloon.ShowBalloonTip($seconds_notification)
     Remove-Item -Path "$HOME\$credentials_file"
     Start-Sleep -seconds $seconds_notification
-    $global:run = $false
 }
 
 #Main loop
@@ -335,6 +341,7 @@ while ($global:run)
             {
                $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_connected)
                $global:retry = 0
+               $global:internet = $true
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
                $balloon.BalloonTipText = 'VPN successfully re-connected'
                $balloon.ShowBalloonTip($seconds_notification)
@@ -361,8 +368,19 @@ while ($global:run)
         {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
-           if($global:retry -lt $number_retries)
+           if((Get-NetConnectionProfile).IPv4Connectivity -notcontains "Internet")
            {
+               if($global:internet)
+               {
+                   $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
+                   $balloon.BalloonTipText = 'Internet connection failed, the VPN will be reconnected once the internet connection is restored.'
+                   $balloon.ShowBalloonTip($seconds_notification)
+                   $global:internet = $false
+               }
+           }
+           elseif($global:retry -lt $number_retries)
+           {
+               $global:internet = $true
                $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
                $balloon.BalloonTipText = 'VPN not connected. Retrying...'
                $balloon.ShowBalloonTip($seconds_notification)
