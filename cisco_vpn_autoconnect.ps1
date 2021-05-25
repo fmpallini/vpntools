@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.40
+   CISCO VPN Auto Reconnect Script - version 2.41
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -17,7 +17,6 @@
    If your connection is failing, try looking at the output file at your home folder or try to connect manually by calling 'vpncli.exe connect vpnname' command and analyzing what outputs your VPN is answering.
 
    TODO:
-   - Suppress VPN's Daemon popup notifications;
    - Don't rely on eternal loop/sleep. Discover a way to make GUI events to be immediately handled, then isolating the monitor function and the GUI events;
    - Rename somehow the powershell process on Windows process manager;
 #>
@@ -94,6 +93,8 @@ Function VPNConnect()
 
               [void] [WinFunc]::ShowWindowAsync($window,1)
               [void] [WinFunc]::SetForegroundWindow($window)
+
+              [void] [WinFunc]::BlockInput($true)
 
               if (Select-String -pattern "Group:" -InputObject $last_line)
               {
@@ -368,6 +369,11 @@ while ($global:run)
         {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
+           while($messagebox = Get-Process csrss | Where-Object {$_.MainWindowTitle -match "Cisco AnyConnect"})
+           {
+             $messagebox.CloseMainWindow()
+           }
+
            if((Get-NetConnectionProfile).IPv4Connectivity -notcontains "Internet")
            {
                if($global:internet)
@@ -377,6 +383,9 @@ while ($global:run)
                    $balloon.ShowBalloonTip($seconds_notification)
                    $global:internet = $false
                }
+
+               Start-Sleep -seconds $seconds_main_loop
+               [System.Windows.Forms.Application]::DoEvents()
            }
            elseif($global:retry -lt $number_retries)
            {
