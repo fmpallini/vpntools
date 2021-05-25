@@ -316,7 +316,7 @@ if(Select-String -pattern "state: Connected" -InputObject $outputStatus)
     $balloon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
     $balloon.BalloonTipText = 'VPN successfully connected.'
     $balloon.ShowBalloonTip($seconds_notification)
-	$global:run = $true
+    $global:run = $true
 }
 else
 {
