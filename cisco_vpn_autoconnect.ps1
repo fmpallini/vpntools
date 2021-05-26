@@ -1,5 +1,5 @@
 <#
-   CISCO VPN Auto Reconnect Script - version 2.41
+   CISCO VPN Auto Reconnect Script - version 2.42
    Tested with AnyConnect 3.1.x and 4.5+.
    https://github.com/fmpallini/vpntools/blob/master/cisco_vpn_autoconnect.ps1
 
@@ -69,16 +69,16 @@ Add-Type @'
 Function VPNConnect()
 {
     if((Get-NetConnectionProfile).IPv4Connectivity -notcontains "Internet")
-    {   
+    {
+        "["+ (Get-Date).ToString() + "] No internet connection." | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
         return
     }
 
     $vpncli = Start-Process -FilePath "$vpncli_path\vpncli.exe" -ArgumentList "connect $vpn_url" -RedirectStandardOutput "$HOME\$connection_stdout" -WindowStyle Minimized -PassThru
-    $counter = 0.0
+    $timeOut = (Get-Date).AddSeconds($seconds_connection_fail)
 
-    while($counter -lt $seconds_connection_fail -and !$vpncli.HasExited)
+    while((Get-Date) -lt $timeOut -and !$vpncli.HasExited)
     {
-        $counter = $counter + 0.5
         $last_line = Get-Content "$HOME\$connection_stdout" -Tail 1
 
         if((Select-String -pattern "Group:" -InputObject $last_line) -or (Select-String -pattern "Username:" -InputObject $last_line))
@@ -114,9 +114,8 @@ Function VPNConnect()
               [void] [WinFunc]::BlockInput($false)
 
               #wait for connection
-              while($counter -lt $seconds_connection_fail -and !$vpncli.HasExited)
+              while((Get-Date) -lt $timeOut -and !$vpncli.HasExited)
               {
-                $counter = $counter + 0.5
                 Start-Sleep -Milliseconds 500
               }
            }
@@ -131,8 +130,9 @@ Function VPNConnect()
     {
         $vpncli.Kill()
     }
-    "---`r`n`Last connection process finished at " + (Get-Date).ToString() + " using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
-    Remove-Variable counter, last_line, window, ptrPass, vpncli, shell
+
+    "---`r`n`r`n`["+ (Get-Date).ToString() + "] Connection process finished. Using the configuration stored on $HOME\$credentials_file" | Out-File "$HOME\$connection_stdout" -Append -Encoding ASCII
+    Remove-Variable timeOut, last_line, window, ptrPass, vpncli, shell
 }
 
 Function VPNDisconnect()
@@ -369,6 +369,7 @@ while ($global:run)
         {
            $balloon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($ico_warning)
 
+           # Closes message boxes from VPN Daemon like 'Reconnect its disabled', 'Connection Lost', etc.
            while($messagebox = Get-Process csrss | Where-Object {$_.MainWindowTitle -match "Cisco AnyConnect"})
            {
              $messagebox.CloseMainWindow()
